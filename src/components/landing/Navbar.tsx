@@ -1,6 +1,6 @@
 import { Lock } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import { WalletButton } from "@/components/wallet/WalletButton";
 
 export function Navbar() {
   return (
@@ -19,11 +19,7 @@ export function Navbar() {
           <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
         </div>
 
-        <Link to="/dashboard">
-          <Button variant="hero" size="sm" className="rounded-lg">
-            Launch App
-          </Button>
-        </Link>
+        <WalletButton />
       </div>
     </nav>
   );
