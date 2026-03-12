@@ -1,5 +1,6 @@
-import { Bell, Wallet, ChevronDown } from "lucide-react";
+import { Bell, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { WalletButton } from "@/components/wallet/WalletButton";
 
 export function DashboardHeader() {
   return (
@@ -7,10 +8,7 @@ export function DashboardHeader() {
       <div />
 
       <div className="flex items-center gap-4">
-        <div className="hidden sm:flex items-center gap-2 rounded-lg border border-border bg-secondary/50 px-3 py-1.5 text-sm">
-          <Wallet className="h-4 w-4 text-accent" />
-          <span className="text-muted-foreground font-mono text-xs">0x7a3B...f29D</span>
-        </div>
+        <WalletButton />
 
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-4 w-4" />
