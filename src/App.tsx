@@ -5,6 +5,14 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import DashboardLayout from "./pages/DashboardLayout.tsx";
+import DashboardHome from "./pages/DashboardHome.tsx";
+import UploadPage from "./pages/UploadPage.tsx";
+import FilesPage from "./pages/FilesPage.tsx";
+import SharedPage from "./pages/SharedPage.tsx";
+import AccessControlPage from "./pages/AccessControlPage.tsx";
+import SettingsPage from "./pages/SettingsPage.tsx";
+import LockerPage from "./pages/LockerPage.tsx";
 
 const queryClient = new QueryClient();
 
@@ -16,7 +24,15 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="/dashboard" element={<DashboardLayout />}>
+            <Route index element={<DashboardHome />} />
+            <Route path="files" element={<FilesPage />} />
+            <Route path="upload" element={<UploadPage />} />
+            <Route path="shared" element={<SharedPage />} />
+            <Route path="access" element={<AccessControlPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+          </Route>
+          <Route path="/locker" element={<LockerPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
