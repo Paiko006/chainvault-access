@@ -75,6 +75,9 @@ export default function UploadPage() {
           blobData: fileData
         }],
         expirationMicros: Date.now() * 1000 + 86400000000 * 30, // 30 days
+        options: {
+          maxGasAmount: 20000,
+        }
       });
     } catch (err) {
       console.error(err);
