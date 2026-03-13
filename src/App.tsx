@@ -14,14 +14,17 @@ import AccessControlPage from "./pages/AccessControlPage.tsx";
 import SettingsPage from "./pages/SettingsPage.tsx";
 import LockerPage from "./pages/LockerPage.tsx";
 
+import { Network } from "@aptos-labs/ts-sdk";
 import * as AptosWallet from "@aptos-labs/wallet-adapter-react";
 import { AptosCoreProvider } from "./components/providers/AptosCoreProvider";
 import { ShelbyClient } from "@shelby-protocol/sdk/browser";
 import { ShelbyClientProvider } from "@shelby-protocol/react";
 
+console.log("Shelby API Key configured:", !!import.meta.env.VITE_SHELBY_API_KEY);
+
 const queryClient = new QueryClient();
 const shelbyClient = new ShelbyClient({
-  network: "testnet" as any,
+  network: Network.TESTNET,
   apiKey: import.meta.env.VITE_SHELBY_API_KEY,
 });
 
@@ -29,7 +32,7 @@ const App = () => (
   <AptosWallet.AptosWalletAdapterProvider 
     autoConnect={true} 
     optInWallets={["Petra"]}
-    dappConfig={{ network: 'testnet' as any }}
+    dappConfig={{ network: Network.TESTNET }}
   >
     <ShelbyClientProvider client={shelbyClient}>
       <QueryClientProvider client={queryClient}>

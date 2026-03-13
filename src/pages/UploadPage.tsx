@@ -17,13 +17,20 @@ export default function UploadPage() {
       toast.success("File successfully secured on Shelby network!");
       setFile(null);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error("Shelby Upload error details:", error);
+      
+      // Check for authentication error
+      if (error?.response?.status === 401 || error?.message?.includes("Unauthorized")) {
+        toast.error("Authentication Error: Please check your Shelby API Key.");
+        console.error("Failed due to missing or invalid API Key. Ensure VITE_SHELBY_API_KEY is set.");
+      } else {
+        toast.error("Failed to upload file to Shelby network.");
+      }
+
       if (error instanceof Error) {
         console.error("Error message:", error.message);
-        console.error("Error stack:", error.stack);
       }
-      toast.error("Failed to upload file to Shelby network.");
     }
   });
 
