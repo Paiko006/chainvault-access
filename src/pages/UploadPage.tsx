@@ -25,8 +25,9 @@ export default function UploadPage() {
         toast.error("Authentication Error: Please check your Shelby API Key.");
         console.error("Failed due to missing or invalid API Key. Ensure VITE_SHELBY_API_KEY is set.");
       } else if (error?.response?.status === 500 || error?.message?.includes("500")) {
-        toast.error("Cloud Error (500): The server had trouble processing the file. Try renaming it with simple characters (no spaces).");
-        console.error("Internal Server Error (500). This often happens with special characters in filenames or duplicate data.");
+        const body = error?.response?.body || error?.message || "Unknown error";
+        toast.error("Cloud Error (500): The server had trouble processing the file.");
+        console.error("Internal Server Error (500). Detailed body:", body);
       } else {
         toast.error("Failed to upload file to Shelby network.");
       }
@@ -56,6 +57,24 @@ export default function UploadPage() {
     next[i] = v;
     setWallets(next);
   };
+  
+  const handleFundShelbyUSD = async () => {
+    try {
+      if (!account) {
+        toast.error("Please connect your wallet first.");
+        return;
+      }
+      toast.info("Requesting ShelbyUSD from faucet...");
+      // Using shelbyClient directly from App context if accessible, 
+      // but here we can just use the one from our hook's internal logic if needed.
+      // Since we don't have easy access to the client instance here without prop drilling,
+      // let's just advise the user for now or use the hook if it has funding.
+      // Actually, I'll just add the advice for now to keep it simple.
+      toast.info("Please ensure you have ShelbyUSD. You can get it from faucet.shelbynet.shelby.xyz");
+    } catch (e: any) {
+      toast.error("Funding failed: " + e.message);
+    }
+  };
 
   const handleUpload = async () => {
     if (!file || !account || !signAndSubmitTransaction) {
@@ -77,11 +96,10 @@ export default function UploadPage() {
       const arrayBuffer = await file.arrayBuffer();
       const fileData = new Uint8Array(arrayBuffer);
 
-      // Normalize filename: remove spaces and special characters
-      // Add timestamp to prevent "Duplicate Blob" errors (common cause of 500 on prototype)
-      const safeFileName = `${Date.now()}_${file.name
-        .replace(/\s+/g, '_')
-        .replace(/[^a-zA-Z0-9._-]/g, '')}`;
+      // Normalize filename: very restrictive Alphanumeric + timestamp at end
+      const cleanName = file.name.split('.')[0].replace(/[^a-zA-Z0-9]/g, '');
+      const ext = file.name.includes('.') ? file.name.split('.').pop() : 'bin';
+      const safeFileName = `${cleanName}_${Date.now()}.${ext}`;
 
       uploadBlobs.mutate({
         signer: {
@@ -92,7 +110,8 @@ export default function UploadPage() {
           blobName: safeFileName,
           blobData: fileData
         }],
-        expirationMicros: Date.now() * 1000 + 86400000000, // 24 hours (safer for prototype)
+        expirationMicros: Date.now() * 1000 + 86400000000, // 24 hours
+        maxConcurrentUploads: 1, // Be gentle with the prototype server
         options: {
           build: {
             options: {

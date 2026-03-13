@@ -16,7 +16,7 @@ import LockerPage from "./pages/LockerPage.tsx";
 
 import { Network } from "@aptos-labs/ts-sdk";
 import * as AptosWallet from "@aptos-labs/wallet-adapter-react";
-import { AptosCoreProvider } from "./components/providers/AptosCoreProvider";
+import { AptosCoreProvider } from "./components/wallet/AptosCoreProvider";
 import { ShelbyClient } from "@shelby-protocol/sdk/browser";
 import { ShelbyClientProvider } from "@shelby-protocol/react";
 
@@ -26,12 +26,17 @@ const queryClient = new QueryClient();
 const shelbyClient = new ShelbyClient({
   network: "shelbynet" as any,
   apiKey: import.meta.env.VITE_SHELBY_API_KEY?.trim(),
+  aptos: {
+    network: "shelbynet" as any,
+    fullnode: "https://api.shelbynet.shelby.xyz/v1",
+    indexer: "https://api.shelbynet.shelby.xyz/v1/graphql",
+  },
   rpc: {
     baseUrl: "https://api.shelbynet.shelby.xyz/shelby",
     apiKey: import.meta.env.VITE_SHELBY_API_KEY?.trim(),
   },
   indexer: {
-    baseUrl: "https://api.shelbynet.aptoslabs.com/nocode/v1/public/cmforrguw0042s601fn71f9l2/v1/graphql",
+    baseUrl: "https://api.shelbynet.shelby.xyz/v1/graphql",
     apiKey: import.meta.env.VITE_SHELBY_API_KEY?.trim(),
   }
 });
@@ -40,33 +45,35 @@ const App = () => (
   <AptosWallet.AptosWalletAdapterProvider 
     autoConnect={true} 
     optInWallets={["Petra"]}
-    dappConfig={{ network: "shelbynet" as any }}
+    dappConfig={{ 
+      network: "shelbynet" as Network,
+    }}
   >
-    <ShelbyClientProvider client={shelbyClient}>
-      <QueryClientProvider client={queryClient}>
-        <AptosCoreProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/dashboard" element={<DashboardLayout />}>
-                <Route index element={<DashboardHome />} />
-                <Route path="files" element={<FilesPage />} />
-                <Route path="upload" element={<UploadPage />} />
-                <Route path="shared" element={<SharedPage />} />
-                <Route path="access" element={<AccessControlPage />} />
-                <Route path="settings" element={<SettingsPage />} />
-              </Route>
-              <Route path="/locker" element={<LockerPage />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-        </AptosCoreProvider>
-      </QueryClientProvider>
-    </ShelbyClientProvider>
+    <AptosCoreProvider>
+      <ShelbyClientProvider client={shelbyClient}>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/dashboard" element={<DashboardLayout />}>
+                  <Route index element={<DashboardHome />} />
+                  <Route path="files" element={<FilesPage />} />
+                  <Route path="upload" element={<UploadPage />} />
+                  <Route path="shared" element={<SharedPage />} />
+                  <Route path="access" element={<AccessControlPage />} />
+                  <Route path="settings" element={<SettingsPage />} />
+                </Route>
+                <Route path="/locker" element={<LockerPage />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </TooltipProvider>
+        </QueryClientProvider>
+      </ShelbyClientProvider>
+    </AptosCoreProvider>
   </AptosWallet.AptosWalletAdapterProvider>
 );
 
