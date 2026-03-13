@@ -76,7 +76,7 @@ export default function UploadPage() {
 
       uploadBlobs.mutate({
         signer: {
-          account: account.address.toString(),
+          account: (account as any).accountAddress || account.address.toString(),
           signAndSubmitTransaction: signAndSubmitTransaction as any,
         },
         blobs: [{

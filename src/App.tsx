@@ -26,6 +26,14 @@ const queryClient = new QueryClient();
 const shelbyClient = new ShelbyClient({
   network: "shelbynet" as any,
   apiKey: import.meta.env.VITE_SHELBY_API_KEY?.trim(),
+  rpc: {
+    baseUrl: "https://api.shelbynet.shelby.xyz/shelby",
+    apiKey: import.meta.env.VITE_SHELBY_API_KEY?.trim(),
+  },
+  indexer: {
+    baseUrl: "https://api.shelbynet.aptoslabs.com/nocode/v1/public/cmforrguw0042s601fn71f9l2/v1/graphql",
+    apiKey: import.meta.env.VITE_SHELBY_API_KEY?.trim(),
+  }
 });
 
 const App = () => (
