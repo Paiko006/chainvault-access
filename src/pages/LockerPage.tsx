@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 import { useSearchParams, Link } from "react-router-dom";
-=======
-import { useSearchParams } from "react-router-dom";
->>>>>>> ab58d28a426bb25a3e6b9a070ae41febba4566b0
 import { useState } from "react";
 import { Lock, Download, ShieldOff, FileText, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -80,7 +76,6 @@ export default function LockerPage() {
   }
 
   return (
-<<<<<<< HEAD
     <div className="min-h-screen bg-background flex items-center justify-center p-4 relative">
       <Link 
         to="/" 
@@ -91,10 +86,6 @@ export default function LockerPage() {
         </div>
         <span className="text-sm font-medium">Home</span>
       </Link>
-
-=======
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
->>>>>>> ab58d28a426bb25a3e6b9a070ae41febba4566b0
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

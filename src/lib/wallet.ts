@@ -1,10 +1,9 @@
-<<<<<<< HEAD
 // Helper to shorten address
 export function shortenAddress(addr: string | undefined | null) {
   if (!addr) return "";
   return addr.slice(0, 6) + "..." + addr.slice(-4);
 }
-=======
+
 import { create } from "zustand";
 
 export interface WalletInfo {
@@ -18,12 +17,6 @@ interface WalletState {
   wallet: WalletInfo | null;
   connect: (wallet: WalletInfo) => void;
   disconnect: () => void;
-}
-
-// Helper to shorten address
-export function shortenAddress(addr: string) {
-  if (!addr) return "";
-  return addr.slice(0, 6) + "..." + addr.slice(-4);
 }
 
 // Wallet providers config
@@ -101,4 +94,4 @@ export const useWalletStore = create<WalletState>((set) => ({
   connect: (wallet) => set({ connected: true, wallet }),
   disconnect: () => set({ connected: false, wallet: null }),
 }));
->>>>>>> ab58d28a426bb25a3e6b9a070ae41febba4566b0
+

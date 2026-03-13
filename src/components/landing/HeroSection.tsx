@@ -1,7 +1,6 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Lock, Upload } from "lucide-react";
-<<<<<<< HEAD
 import { useNavigate } from "react-router-dom";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { useState, useEffect } from "react";
@@ -20,11 +19,6 @@ export function HeroSection() {
     }
   };
 
-=======
-import { Link } from "react-router-dom";
-
-export function HeroSection() {
->>>>>>> ab58d28a426bb25a3e6b9a070ae41febba4566b0
   return (
     <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
       <div className="hero-glow absolute inset-0 pointer-events-none" />
@@ -55,7 +49,6 @@ export function HeroSection() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-<<<<<<< HEAD
             <Button 
                variant="hero" 
                size="lg" 
@@ -78,22 +71,6 @@ export function HeroSection() {
       </div>
       
       <ConnectWalletModal open={modalOpen} onClose={() => setModalOpen(false)} />
-=======
-            <Link to="/dashboard">
-              <Button variant="hero" size="lg" className="text-base px-8 py-6 rounded-xl">
-                Launch App
-              </Button>
-            </Link>
-            <Link to="/dashboard/upload">
-              <Button variant="heroOutline" size="lg" className="text-base px-8 py-6 rounded-xl">
-                <Upload className="mr-2 h-4 w-4" />
-                Upload File
-              </Button>
-            </Link>
-          </div>
-        </motion.div>
-      </div>
->>>>>>> ab58d28a426bb25a3e6b9a070ae41febba4566b0
     </section>
   );
 }

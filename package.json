@@ -13,13 +13,10 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-<<<<<<< HEAD
     "@aptos-labs/js-pro": "^0.1.7",
     "@aptos-labs/react": "^0.1.7",
     "@aptos-labs/ts-sdk": "^6.1.0",
     "@aptos-labs/wallet-adapter-react": "^8.3.1",
-=======
->>>>>>> ab58d28a426bb25a3e6b9a070ae41febba4566b0
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
@@ -48,16 +45,12 @@
     "@radix-ui/react-toggle": "^1.1.9",
     "@radix-ui/react-toggle-group": "^1.1.10",
     "@radix-ui/react-tooltip": "^1.2.7",
-<<<<<<< HEAD
     "@shelby-protocol/react": "^1.0.3",
     "@shelby-protocol/sdk": "^0.2.4",
     "@tanstack/react-query": "^5.83.0",
     "@telegram-apps/bridge": "^2.11.0",
     "@wallet-standard/core": "^1.1.1",
     "aptos": "^1.22.1",
-=======
-    "@tanstack/react-query": "^5.83.0",
->>>>>>> ab58d28a426bb25a3e6b9a070ae41febba4566b0
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -67,10 +60,7 @@
     "input-otp": "^1.4.2",
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
-<<<<<<< HEAD
     "petra-plugin-wallet-adapter": "^0.4.5",
-=======
->>>>>>> ab58d28a426bb25a3e6b9a070ae41febba4566b0
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",

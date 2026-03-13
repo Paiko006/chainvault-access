@@ -1,5 +1,4 @@
 import { useState, useCallback } from "react";
-<<<<<<< HEAD
 import { Upload, X, Plus, FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,19 +6,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useUploadBlobs } from "@shelby-protocol/react";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { toast } from "sonner";
-=======
-import { Upload, X, Plus, FileText } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { motion, AnimatePresence } from "framer-motion";
->>>>>>> ab58d28a426bb25a3e6b9a070ae41febba4566b0
 
 export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [wallets, setWallets] = useState<string[]>([""]);
-<<<<<<< HEAD
-  
   const { account, signAndSubmitTransaction } = useWallet();
   const uploadBlobs = useUploadBlobs({
     onSuccess: () => {
@@ -31,8 +22,6 @@ export default function UploadPage() {
       toast.error("Failed to upload file to Shelby network.");
     }
   });
-=======
->>>>>>> ab58d28a426bb25a3e6b9a070ae41febba4566b0
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -54,7 +43,6 @@ export default function UploadPage() {
     setWallets(next);
   };
 
-<<<<<<< HEAD
   const handleUpload = async () => {
     if (!file) return;
     if (!account || !signAndSubmitTransaction) {
@@ -82,9 +70,6 @@ export default function UploadPage() {
       toast.error("Error preparing file data.");
     }
   };
-
-=======
->>>>>>> ab58d28a426bb25a3e6b9a070ae41febba4566b0
   return (
     <div className="max-w-2xl mx-auto space-y-8">
       <div>
@@ -163,7 +148,6 @@ export default function UploadPage() {
         </Button>
       </div>
 
-<<<<<<< HEAD
       <Button 
         variant="hero" 
         size="lg" 
@@ -182,11 +166,6 @@ export default function UploadPage() {
             Upload & Secure File
           </>
         )}
-=======
-      <Button variant="hero" size="lg" className="w-full rounded-xl py-6" disabled={!file}>
-        <Upload className="mr-2 h-4 w-4" />
-        Upload & Secure File
->>>>>>> ab58d28a426bb25a3e6b9a070ae41febba4566b0
       </Button>
     </div>
   );

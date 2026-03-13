@@ -1,9 +1,5 @@
 import { NavLink } from "@/components/NavLink";
-<<<<<<< HEAD
 import { useLocation, Link } from "react-router-dom";
-=======
-import { useLocation } from "react-router-dom";
->>>>>>> ab58d28a426bb25a3e6b9a070ae41febba4566b0
 import {
   LayoutDashboard,
   FileText,
@@ -28,20 +24,12 @@ export function AppSidebar() {
 
   return (
     <aside className="hidden lg:flex flex-col w-64 border-r border-border bg-sidebar shrink-0 h-screen sticky top-0">
-<<<<<<< HEAD
       <Link to="/" className="flex items-center gap-2 px-6 h-16 border-b border-sidebar-border hover:bg-sidebar-accent/30 transition-colors">
-=======
-      <div className="flex items-center gap-2 px-6 h-16 border-b border-sidebar-border">
->>>>>>> ab58d28a426bb25a3e6b9a070ae41febba4566b0
         <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
           <Lock className="h-4 w-4 text-primary-foreground" />
         </div>
         <span className="font-display font-bold text-lg text-sidebar-accent-foreground">ChainLocker</span>
-<<<<<<< HEAD
       </Link>
-=======
-      </div>
->>>>>>> ab58d28a426bb25a3e6b9a070ae41febba4566b0
 
       <nav className="flex-1 px-3 py-4 space-y-1">
         {nav.map((item) => {
