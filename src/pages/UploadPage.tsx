@@ -18,7 +18,11 @@ export default function UploadPage() {
       setFile(null);
     },
     onError: (error) => {
-      console.error("Upload error:", error);
+      console.error("Shelby Upload error details:", error);
+      if (error instanceof Error) {
+        console.error("Error message:", error.message);
+        console.error("Error stack:", error.stack);
+      }
       toast.error("Failed to upload file to Shelby network.");
     }
   });
@@ -56,7 +60,7 @@ export default function UploadPage() {
 
       uploadBlobs.mutate({
         signer: {
-          account: account.address,
+          account: account.address.toString(),
           signAndSubmitTransaction
         },
         blobs: [{
