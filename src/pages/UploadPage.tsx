@@ -25,11 +25,13 @@ export default function UploadPage() {
         toast.error("Authentication Error: Please check your Shelby API Key.");
         console.error("Failed due to missing or invalid API Key. Ensure VITE_SHELBY_API_KEY is set.");
       } else if (error?.response?.status === 500 || error?.message?.includes("500")) {
-        const body = error?.response?.body || error?.message || "Unknown error";
+        const body = error?.response?.data || error?.response?.body || error?.message || "Unknown error";
         toast.error("Cloud Error (500): The server had trouble processing the file.");
-        console.error("Internal Server Error (500). Detailed body:", body);
+        console.error("Internal Server Error (500). Full Error details:", JSON.stringify(error, (k, v) => v instanceof Error ? v.message : v, 2));
+        console.error("Detailed body component:", body);
       } else {
         toast.error("Failed to upload file to Shelby network.");
+        console.error("Unknown Upload Error:", JSON.stringify(error, null, 2));
       }
 
       if (error instanceof Error) {
@@ -101,17 +103,27 @@ export default function UploadPage() {
       const ext = file.name.includes('.') ? file.name.split('.').pop() : 'bin';
       const safeFileName = `${cleanName}_${Date.now()}.${ext}`;
 
+      console.log("DEBUG: Account object structure:", JSON.stringify({
+        address: account.address.toString(),
+        publicKey: account.publicKey?.toString(),
+        ansName: (account as any).ansName,
+        accountAddress: (account as any).accountAddress
+      }, null, 2));
+
       uploadBlobs.mutate({
         signer: {
           account: (account as any).accountAddress || account.address.toString(),
-          signAndSubmitTransaction: signAndSubmitTransaction as any,
+          signAndSubmitTransaction: (args: any) => {
+            console.log("DEBUG: signAndSubmitTransaction called with:", JSON.stringify(args, (k, v) => typeof v === 'bigint' ? v.toString() : v, 2));
+            return signAndSubmitTransaction(args);
+          },
         },
         blobs: [{
           blobName: safeFileName,
           blobData: fileData
         }],
-        expirationMicros: Date.now() * 1000 + 86400000000, // 24 hours
-        maxConcurrentUploads: 1, // Be gentle with the prototype server
+        expirationMicros: (Date.now() + 3600000) * 1000, // 1 hour from now
+        maxConcurrentUploads: 1,
         options: {
           build: {
             options: {
