@@ -83,7 +83,7 @@ export default function UploadPage() {
           blobName: safeFileName,
           blobData: fileData
         }],
-        expirationMicros: Date.now() * 1000 + 86400000000 * 30, // 30 days
+        expirationMicros: Date.now() * 1000 + 86400000000, // 24 hours (safer for prototype)
         options: {
           build: {
             options: {

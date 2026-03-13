@@ -25,7 +25,7 @@ console.log("Shelby API Key configured:", !!import.meta.env.VITE_SHELBY_API_KEY)
 const queryClient = new QueryClient();
 const shelbyClient = new ShelbyClient({
   network: "shelbynet" as any,
-  apiKey: import.meta.env.VITE_SHELBY_API_KEY,
+  apiKey: import.meta.env.VITE_SHELBY_API_KEY?.trim(),
 });
 
 const App = () => (
