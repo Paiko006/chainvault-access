@@ -24,6 +24,9 @@ export default function UploadPage() {
       if (error?.response?.status === 401 || error?.message?.includes("Unauthorized")) {
         toast.error("Authentication Error: Please check your Shelby API Key.");
         console.error("Failed due to missing or invalid API Key. Ensure VITE_SHELBY_API_KEY is set.");
+      } else if (error?.response?.status === 500 || error?.message?.includes("500")) {
+        toast.error("Cloud Error (500): The server had trouble processing the file. Try renaming it with simple characters (no spaces).");
+        console.error("Internal Server Error (500). This often happens with special characters in filenames or duplicate data.");
       } else {
         toast.error("Failed to upload file to Shelby network.");
       }
@@ -65,13 +68,18 @@ export default function UploadPage() {
       const arrayBuffer = await file.arrayBuffer();
       const fileData = new Uint8Array(arrayBuffer);
 
+      // Normalize filename: remove spaces and special characters that might break the prototype RPC
+      const safeFileName = file.name
+        .replace(/\s+/g, '_')
+        .replace(/[^a-zA-Z0-9._-]/g, '');
+
       uploadBlobs.mutate({
         signer: {
           account: account.address.toString(),
-          signAndSubmitTransaction
+          signAndSubmitTransaction: signAndSubmitTransaction as any,
         },
         blobs: [{
-          blobName: file.name,
+          blobName: safeFileName,
           blobData: fileData
         }],
         expirationMicros: Date.now() * 1000 + 86400000000 * 30, // 30 days
