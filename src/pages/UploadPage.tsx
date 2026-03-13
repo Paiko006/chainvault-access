@@ -76,10 +76,11 @@ export default function UploadPage() {
         }],
         expirationMicros: Date.now() * 1000 + 86400000000 * 30, // 30 days
         options: {
-          // Increase gas significantly and try different property names
-          maxGasAmount: 500000,
-          // @ts-ignore - for compatibility with different SDK versions
-          max_gas_amount: 500000,
+          build: {
+            options: {
+              maxGasAmount: 500000,
+            }
+          }
         }
       });
     } catch (err) {
