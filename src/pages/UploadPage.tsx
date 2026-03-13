@@ -58,10 +58,19 @@ export default function UploadPage() {
   };
 
   const handleUpload = async () => {
-    if (!file) return;
-    if (!account || !signAndSubmitTransaction) {
+    if (!file || !account || !signAndSubmitTransaction) {
       toast.error("Please connect your wallet first.");
       return;
+    }
+
+    // Runtime debug: Check if API key is loaded
+    const apiKey = import.meta.env.VITE_SHELBY_API_KEY;
+    if (!apiKey) {
+      console.error("DEBUG: VITE_SHELBY_API_KEY is MISSING in the browser context!");
+      toast.error("Error: API Key not found. Please check your .env file.");
+      return; // Added return here to prevent further execution if API key is missing
+    } else {
+      console.log(`DEBUG: API Key found (starts with: ${apiKey.substring(0, 5)}...)`);
     }
 
     try {
