@@ -1,20 +1,34 @@
 import { useState } from "react";
 import { Wallet, ChevronDown, LogOut, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+<<<<<<< HEAD
 import { shortenAddress } from "@/lib/wallet";
 import { ConnectWalletModal } from "@/components/wallet/ConnectWalletModal";
 import { toast } from "sonner";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
+=======
+import { useWalletStore, shortenAddress } from "@/lib/wallet";
+import { ConnectWalletModal } from "@/components/wallet/ConnectWalletModal";
+import { toast } from "sonner";
+>>>>>>> ab58d28a426bb25a3e6b9a070ae41febba4566b0
 
 export function WalletButton() {
   const [modalOpen, setModalOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+<<<<<<< HEAD
   const { connected, account, disconnect, wallet } = useWallet();
 
   const handleCopy = () => {
     if (account?.address) {
       navigator.clipboard.writeText(account.address);
+=======
+  const { connected, wallet, disconnect } = useWalletStore();
+
+  const handleCopy = () => {
+    if (wallet?.address) {
+      navigator.clipboard.writeText(wallet.address);
+>>>>>>> ab58d28a426bb25a3e6b9a070ae41febba4566b0
       setCopied(true);
       toast.success("Address copied");
       setTimeout(() => setCopied(false), 2000);
@@ -27,7 +41,11 @@ export function WalletButton() {
     toast.info("Wallet disconnected");
   };
 
+<<<<<<< HEAD
   if (!connected || !account || !wallet) {
+=======
+  if (!connected || !wallet) {
+>>>>>>> ab58d28a426bb25a3e6b9a070ae41febba4566b0
     return (
       <>
         <Button
@@ -50,6 +68,7 @@ export function WalletButton() {
         onClick={() => setDropdownOpen(!dropdownOpen)}
         className="flex items-center gap-2 rounded-lg border border-border bg-secondary/50 px-3 py-1.5 text-sm hover:bg-secondary/80 transition-colors"
       >
+<<<<<<< HEAD
         <div className="h-5 w-5 shrink-0">
           {(wallet as any)?.icon ? (
             <img src={(wallet as any).icon} alt={(wallet as any).name} className="h-full w-full object-contain" />
@@ -59,6 +78,11 @@ export function WalletButton() {
         </div>
         <span className="text-muted-foreground font-mono text-xs">
           {shortenAddress(account.address)}
+=======
+        <span className="text-lg">{wallet.icon}</span>
+        <span className="text-muted-foreground font-mono text-xs">
+          {shortenAddress(wallet.address)}
+>>>>>>> ab58d28a426bb25a3e6b9a070ae41febba4566b0
         </span>
         <ChevronDown className="h-3 w-3 text-muted-foreground" />
       </button>
@@ -68,8 +92,13 @@ export function WalletButton() {
           <div className="fixed inset-0 z-40" onClick={() => setDropdownOpen(false)} />
           <div className="absolute right-0 top-full mt-2 z-50 w-56 rounded-xl border border-border bg-card shadow-xl p-2 space-y-1">
             <div className="px-3 py-2 border-b border-border/50 mb-1">
+<<<<<<< HEAD
               <div className="text-xs text-muted-foreground">{(wallet as any)?.name}</div>
               <div className="text-xs font-mono text-foreground mt-0.5">{shortenAddress(account.address)}</div>
+=======
+              <div className="text-xs text-muted-foreground">{wallet.name}</div>
+              <div className="text-xs font-mono text-foreground mt-0.5">{shortenAddress(wallet.address)}</div>
+>>>>>>> ab58d28a426bb25a3e6b9a070ae41febba4566b0
             </div>
 
             <button

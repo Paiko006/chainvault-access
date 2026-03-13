@@ -14,6 +14,7 @@ import AccessControlPage from "./pages/AccessControlPage.tsx";
 import SettingsPage from "./pages/SettingsPage.tsx";
 import LockerPage from "./pages/LockerPage.tsx";
 
+<<<<<<< HEAD
 import * as AptosWallet from "@aptos-labs/wallet-adapter-react";
 import { AptosCoreProvider } from "./components/providers/AptosCoreProvider";
 import { ShelbyClient } from "@shelby-protocol/sdk/browser";
@@ -56,6 +57,32 @@ const App = () => (
       </QueryClientProvider>
     </ShelbyClientProvider>
   </AptosWallet.AptosWalletAdapterProvider>
+=======
+const queryClient = new QueryClient();
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/dashboard" element={<DashboardLayout />}>
+            <Route index element={<DashboardHome />} />
+            <Route path="files" element={<FilesPage />} />
+            <Route path="upload" element={<UploadPage />} />
+            <Route path="shared" element={<SharedPage />} />
+            <Route path="access" element={<AccessControlPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+          </Route>
+          <Route path="/locker" element={<LockerPage />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
+    </TooltipProvider>
+  </QueryClientProvider>
+>>>>>>> ab58d28a426bb25a3e6b9a070ae41febba4566b0
 );
 
 export default App;
