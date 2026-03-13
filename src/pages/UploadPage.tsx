@@ -68,10 +68,11 @@ export default function UploadPage() {
       const arrayBuffer = await file.arrayBuffer();
       const fileData = new Uint8Array(arrayBuffer);
 
-      // Normalize filename: remove spaces and special characters that might break the prototype RPC
-      const safeFileName = file.name
+      // Normalize filename: remove spaces and special characters
+      // Add timestamp to prevent "Duplicate Blob" errors (common cause of 500 on prototype)
+      const safeFileName = `${Date.now()}_${file.name
         .replace(/\s+/g, '_')
-        .replace(/[^a-zA-Z0-9._-]/g, '');
+        .replace(/[^a-zA-Z0-9._-]/g, '')}`;
 
       uploadBlobs.mutate({
         signer: {

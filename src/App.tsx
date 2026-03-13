@@ -32,7 +32,7 @@ const App = () => (
   <AptosWallet.AptosWalletAdapterProvider 
     autoConnect={true} 
     optInWallets={["Petra"]}
-    dappConfig={{ network: Network.TESTNET }}
+    dappConfig={{ network: "shelbynet" as any }}
   >
     <ShelbyClientProvider client={shelbyClient}>
       <QueryClientProvider client={queryClient}>
