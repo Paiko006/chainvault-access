@@ -20,38 +20,39 @@ import { AptosCoreProvider } from "./components/wallet/AptosCoreProvider";
 import { ShelbyClient } from "@shelby-protocol/sdk/browser";
 import { ShelbyClientProvider } from "@shelby-protocol/react";
 
-console.log("Shelby API Key configured:", !!import.meta.env.VITE_SHELBY_API_KEY);
+const shelbyApiKey = import.meta.env.VITE_SHELBY_API_KEY?.trim();
+const aptosApiKey  = import.meta.env.VITE_APTOS_API_KEY?.trim();
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { retry: 1, refetchOnWindowFocus: false },
+  },
+});
+
+// Shelby SDK configured for Aptos Testnet
+// Testnet RPC: https://api.testnet.shelby.xyz/shelby
+// Aptos Fullnode: https://api.testnet.aptoslabs.com/v1
 const shelbyClient = new ShelbyClient({
-  network: "shelbynet" as any,
-  apiKey: import.meta.env.VITE_SHELBY_API_KEY?.trim(),
-  aptos: {
-    network: "shelbynet" as any,
-    fullnode: "https://api.shelbynet.shelby.xyz/v1",
-    indexer: "https://api.shelbynet.shelby.xyz/v1/graphql",
-  },
-  rpc: {
-    baseUrl: "https://api.shelbynet.shelby.xyz/shelby",
-    apiKey: import.meta.env.VITE_SHELBY_API_KEY?.trim(),
-  },
-  indexer: {
-    baseUrl: "https://api.shelbynet.shelby.xyz/v1/graphql",
-    apiKey: import.meta.env.VITE_SHELBY_API_KEY?.trim(),
-  }
+  network: Network.TESTNET,
+  apiKey: shelbyApiKey,
 });
 
 const App = () => (
-  <AptosWallet.AptosWalletAdapterProvider 
-    autoConnect={true} 
-    optInWallets={["Petra"]}
-    dappConfig={{ 
-      network: "shelbynet" as Network,
-    }}
-  >
-    <AptosCoreProvider>
-      <ShelbyClientProvider client={shelbyClient}>
-        <QueryClientProvider client={queryClient}>
+  <QueryClientProvider client={queryClient}>
+    <AptosWallet.AptosWalletAdapterProvider
+      autoConnect={true}
+      dappConfig={{
+        network: Network.TESTNET,
+        aptosApiKeys: {
+          testnet: aptosApiKey,
+        },
+      }}
+      onError={(error) => {
+        console.warn("[WalletAdapter]", error);
+      }}
+    >
+      <AptosCoreProvider>
+        <ShelbyClientProvider client={shelbyClient}>
           <TooltipProvider>
             <Toaster />
             <Sonner />
@@ -71,10 +72,10 @@ const App = () => (
               </Routes>
             </BrowserRouter>
           </TooltipProvider>
-        </QueryClientProvider>
-      </ShelbyClientProvider>
-    </AptosCoreProvider>
-  </AptosWallet.AptosWalletAdapterProvider>
+        </ShelbyClientProvider>
+      </AptosCoreProvider>
+    </AptosWallet.AptosWalletAdapterProvider>
+  </QueryClientProvider>
 );
 
 export default App;
