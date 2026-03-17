@@ -20,62 +20,85 @@ import { AptosCoreProvider } from "./components/wallet/AptosCoreProvider";
 import { ShelbyClient } from "@shelby-protocol/sdk/browser";
 import { ShelbyClientProvider } from "@shelby-protocol/react";
 
-const shelbyApiKey = import.meta.env.VITE_SHELBY_API_KEY?.trim();
-const aptosApiKey  = import.meta.env.VITE_APTOS_API_KEY?.trim();
+import { useMemo } from "react";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: { retry: 1, refetchOnWindowFocus: false },
-  },
-});
+const App = () => {
+  const shelbyApiKey = import.meta.env.VITE_SHELBY_API_KEY?.trim();
+  const aptosApiKey = import.meta.env.VITE_APTOS_API_KEY?.trim();
 
-// Shelby SDK configured for Aptos Testnet
-// Testnet RPC: https://api.testnet.shelby.xyz/shelby
-// Aptos Fullnode: https://api.testnet.aptoslabs.com/v1
-const shelbyClient = new ShelbyClient({
-  network: Network.TESTNET,
-  apiKey: shelbyApiKey,
-});
+  // Diagnostics inside the component lifecycle
+  useMemo(() => {
+    if (typeof window !== "undefined") {
+      console.log("%c[ChainVault Deployment Info]", "color: #10b981; font-weight: bold;");
+      console.log("Origin:", window.location.origin);
+      console.log("Shelby Key:", shelbyApiKey ? `Detected (${shelbyApiKey.slice(0, 5)}...)` : "NOT FOUND");
+      if (!shelbyApiKey) {
+        console.error("CRITICAL: VITE_SHELBY_API_KEY is missing! Check Vercel Environment Variables.");
+      }
+    }
+  }, [shelbyApiKey]);
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AptosWallet.AptosWalletAdapterProvider
-      autoConnect={true}
-      dappConfig={{
-        network: Network.TESTNET,
-        aptosApiKeys: {
-          testnet: aptosApiKey,
-        },
-      }}
-      onError={(error) => {
-        console.warn("[WalletAdapter]", error);
-      }}
-    >
-      <AptosCoreProvider>
-        <ShelbyClientProvider client={shelbyClient}>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/dashboard" element={<DashboardLayout />}>
-                  <Route index element={<DashboardHome />} />
-                  <Route path="files" element={<FilesPage />} />
-                  <Route path="upload" element={<UploadPage />} />
-                  <Route path="shared" element={<SharedPage />} />
-                  <Route path="access" element={<AccessControlPage />} />
-                  <Route path="settings" element={<SettingsPage />} />
-                </Route>
-                <Route path="/locker" element={<LockerPage />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
-          </TooltipProvider>
-        </ShelbyClientProvider>
-      </AptosCoreProvider>
-    </AptosWallet.AptosWalletAdapterProvider>
-  </QueryClientProvider>
-);
+  const queryClient = useMemo(() => new QueryClient({
+    defaultOptions: {
+      queries: { retry: 1, refetchOnWindowFocus: false },
+    },
+  }), []);
+
+  // Initialize clients inside useMemo to ensure env vars are ready
+  const shelbyClient = useMemo(() => new ShelbyClient({
+    network: Network.TESTNET,
+    apiKey: shelbyApiKey,
+    // Explicitly set base URLs to ensure keys are passed to correct endpoints
+    rpc: {
+      baseUrl: "https://api.testnet.shelby.xyz/shelby",
+      apiKey: shelbyApiKey,
+    },
+    indexer: {
+      baseUrl: "https://api.testnet.shelby.xyz/v1/graphql",
+      apiKey: shelbyApiKey,
+    }
+  }), [shelbyApiKey]);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AptosWallet.AptosWalletAdapterProvider
+        autoConnect={true}
+        dappConfig={{
+          network: Network.TESTNET,
+          aptosApiKeys: {
+            testnet: aptosApiKey,
+          },
+        }}
+        onError={(error) => {
+          console.warn("[WalletAdapter]", error);
+        }}
+      >
+        <AptosCoreProvider>
+          <ShelbyClientProvider client={shelbyClient}>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/dashboard" element={<DashboardLayout />}>
+                    <Route index element={<DashboardHome />} />
+                    <Route path="files" element={<FilesPage />} />
+                    <Route path="upload" element={<UploadPage />} />
+                    <Route path="shared" element={<SharedPage />} />
+                    <Route path="access" element={<AccessControlPage />} />
+                    <Route path="settings" element={<SettingsPage />} />
+                  </Route>
+                  <Route path="/locker" element={<LockerPage />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </BrowserRouter>
+            </TooltipProvider>
+          </ShelbyClientProvider>
+        </AptosCoreProvider>
+      </AptosWallet.AptosWalletAdapterProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
