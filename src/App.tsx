@@ -54,7 +54,7 @@ const App = () => {
       apiKey: shelbyApiKey,
     },
     indexer: {
-      baseUrl: "https://api.testnet.shelby.xyz/v1/graphql",
+      baseUrl: "https://api.testnet.aptoslabs.com/nocode/v1/public/alias/shelby/testnet/v1/graphql",
       apiKey: shelbyApiKey,
     }
   }), [shelbyApiKey]);
