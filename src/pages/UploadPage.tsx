@@ -40,17 +40,7 @@ export default function UploadPage() {
 
   const uploadBlobs = useUploadBlobs({
     onSuccess: () => {
-      if (file && account) {
-        saveToLocalStorage({
-          blobName: file.name,
-          uploadedAt: Date.now(),
-          sizeBytes: file.size,
-          ownerAddress: account.address.toString(),
-          expirationMicros,
-        });
-      }
-      toast.success("File successfully secured on Shelby testnet! ✅");
-      setFile(null);
+      // Logic moved to mutate call for access to safeFileName
     },
     onError: (error: any) => {
       console.error("[ChainVault] Upload error:", error);
@@ -139,6 +129,18 @@ export default function UploadPage() {
           },
         ],
         expirationMicros,
+      }, {
+        onSuccess: () => {
+          saveToLocalStorage({
+            blobName: safeFileName, // Use the actual name sent to Shelby
+            uploadedAt: Date.now(),
+            sizeBytes: file.size,
+            ownerAddress: account.address.toString(),
+            expirationMicros,
+          });
+          toast.success("File successfully secured on Shelby testnet! ✅");
+          setFile(null);
+        }
       });
     } catch (err) {
       console.error("[ChainVault] Error preparing file:", err);
