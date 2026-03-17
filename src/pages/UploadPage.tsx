@@ -6,25 +6,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useUploadBlobs } from "@shelby-protocol/react";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { toast } from "sonner";
-
-// Local storage key for tracking uploaded blobs
-const BLOBS_STORAGE_KEY = "chainvault_blobs";
-
-export interface StoredBlob {
-  blobName: string;
-  uploadedAt: number;
-  sizeBytes: number;
-  ownerAddress: string;
-  expirationMicros: number;
-}
+import { BLOBS_STORAGE_KEY, StoredBlob, getStoredBlobs, saveStoredBlobs } from "@/types/storage";
 
 function saveToLocalStorage(blob: StoredBlob) {
   try {
-    const existing: StoredBlob[] = JSON.parse(
-      localStorage.getItem(BLOBS_STORAGE_KEY) || "[]"
-    );
+    const existing = getStoredBlobs();
     existing.unshift(blob);
-    localStorage.setItem(BLOBS_STORAGE_KEY, JSON.stringify(existing));
+    saveStoredBlobs(existing);
   } catch {
     // ignore
   }
@@ -131,15 +119,20 @@ export default function UploadPage() {
         expirationMicros,
       }, {
         onSuccess: () => {
+          // Filter out empty wallets
+          const sharedWith = wallets.filter(w => w.trim() !== "");
+          
           saveToLocalStorage({
-            blobName: safeFileName, // Use the actual name sent to Shelby
+            blobName: safeFileName,
             uploadedAt: Date.now(),
             sizeBytes: file.size,
             ownerAddress: account.address.toString(),
             expirationMicros,
+            sharedWith,
           });
           toast.success("File successfully secured on Shelby testnet! ✅");
           setFile(null);
+          setWallets([""]); // Reset shared list
         }
       });
     } catch (err) {

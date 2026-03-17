@@ -1,29 +1,12 @@
 import { useState } from "react";
-import { FileText, Trash2, ExternalLink, Upload, Search, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { useWallet } from "@aptos-labs/wallet-adapter-react";
-import { Link } from "react-router-dom";
-import { StoredBlob } from "./UploadPage";
+import { Share2, FileText, Trash2, ExternalLink, Upload, Search, X, Loader2 } from "lucide-react";
 import { useDeleteBlobs } from "@shelby-protocol/react";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
-
-const BLOBS_STORAGE_KEY = "chainvault_blobs";
-
-function getStoredBlobs(): StoredBlob[] {
-  try {
-    return JSON.parse(localStorage.getItem(BLOBS_STORAGE_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function deleteBlob(index: number) {
-  const blobs = getStoredBlobs();
-  blobs.splice(index, 1);
-  localStorage.setItem(BLOBS_STORAGE_KEY, JSON.stringify(blobs));
-}
+import { useWallet } from "@aptos-labs/wallet-adapter-react";
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { BLOBS_STORAGE_KEY, StoredBlob, getStoredBlobs, saveStoredBlobs } from "@/types/storage";
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -89,7 +72,7 @@ export default function FilesPage() {
         if (realIdx !== -1) {
           const blobs = getStoredBlobs();
           blobs.splice(realIdx, 1);
-          localStorage.setItem(BLOBS_STORAGE_KEY, JSON.stringify(blobs));
+          saveStoredBlobs(blobs);
         }
       }
     });
@@ -213,18 +196,26 @@ export default function FilesPage() {
                         {formatDate(b.uploadedAt)}
                       </td>
                       <td className="px-5 py-3.5">
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-                            expired
-                              ? "bg-muted text-muted-foreground"
-                              : "bg-accent/10 text-accent"
-                          }`}
-                        >
-                          {!expired && (
-                            <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+                        <div className="flex flex-wrap gap-1.5 item-center">
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                              expired
+                                ? "bg-muted text-muted-foreground"
+                                : "bg-accent/10 text-accent"
+                            }`}
+                          >
+                            {!expired && (
+                              <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+                            )}
+                            {expired ? "Expired" : "Active"}
+                          </span>
+                          {b.sharedWith && b.sharedWith.length > 0 && (
+                            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-primary/10 text-primary">
+                              <Share2 className="h-3 w-3" />
+                              Shared
+                            </span>
                           )}
-                          {expired ? "Expired" : "Active"}
-                        </span>
+                        </div>
                       </td>
                       <td className="px-5 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-1">

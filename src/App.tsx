@@ -23,7 +23,8 @@ import { ShelbyClientProvider } from "@shelby-protocol/react";
 import { useMemo } from "react";
 
 const App = () => {
-  const shelbyApiKey = import.meta.env.VITE_SHELBY_API_KEY?.trim();
+  // Priority: localStorage (from Settings UI) > environment variables
+  const shelbyApiKey = (localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY)?.trim();
   const aptosApiKey = import.meta.env.VITE_APTOS_API_KEY?.trim();
 
   // Diagnostics inside the component lifecycle
