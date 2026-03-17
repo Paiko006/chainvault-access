@@ -105,8 +105,8 @@ export default function UploadPage() {
     }
 
     const apiKey = import.meta.env.VITE_SHELBY_API_KEY;
-    if (!apiKey) {
-      toast.error("API Key not found — set VITE_SHELBY_API_KEY in your .env file");
+    if (!apiKey || apiKey.trim() === "") {
+      toast.error("API Key kosong — isi VITE_SHELBY_API_KEY di file .env lalu restart dev server");
       return;
     }
 
