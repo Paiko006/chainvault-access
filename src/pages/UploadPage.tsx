@@ -55,15 +55,17 @@ export default function UploadPage() {
     onError: (error: any) => {
       console.error("[ChainVault] Upload error:", error);
       const msg = error?.message || "";
+      const status = error?.response?.status;
 
-      if (msg.includes("401") || msg.includes("Unauthorized")) {
+      if (status === 401 || msg.includes("401") || msg.includes("Unauthorized")) {
         toast.error(
-          "API Key invalid or missing — check your VITE_SHELBY_API_KEY in .env"
+          "🔐 Auth Error (401): Masalah API Key atau Whitelist Origin."
         );
+        console.error("ANALISIS: Geomi menolak request. Pastikan 'http://localhost:8080' sudah Anda tambahkan ke 'Allowed Origins' di dashboard geomi.dev untuk key ini.");
+      } else if (status === 403) {
+        toast.error("Forbidden (403): Origin tidak diizinkan oleh Geomi.");
       } else if (msg.includes("500")) {
         toast.error("Shelby server error (500). Try again shortly.");
-      } else if (msg.includes("insufficient")) {
-        toast.error("Insufficient shelbyUSD balance. Fund your account first.");
       } else {
         toast.error("Upload failed: " + (msg || "Unknown error"));
       }
@@ -105,8 +107,8 @@ export default function UploadPage() {
     }
 
     const apiKey = import.meta.env.VITE_SHELBY_API_KEY;
-    if (!apiKey || apiKey.trim() === "") {
-      toast.error("API Key kosong — isi VITE_SHELBY_API_KEY di file .env lalu restart dev server");
+    if (!apiKey || apiKey.trim() === "" || apiKey.includes("XXXXXXXX")) {
+      toast.error("VITE_SHELBY_API_KEY belum diisi di .env");
       return;
     }
 
