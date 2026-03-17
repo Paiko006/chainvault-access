@@ -40,7 +40,7 @@ function formatDate(ms: number) {
 }
 
 export default function FilesPage() {
-  const { connected, account } = useWallet();
+  const { connected, account, signAndSubmitTransaction } = useWallet();
   const [search, setSearch] = useState("");
   const [refresh, setRefresh] = useState(0);
 
@@ -64,7 +64,7 @@ export default function FilesPage() {
   });
 
   const handleDelete = async (idx: number) => {
-    if (!connected || !account) {
+    if (!connected || !account || !signAndSubmitTransaction) {
       toast.error("Please connect your wallet first.");
       return;
     }
@@ -75,8 +75,7 @@ export default function FilesPage() {
     deleteBlobs.mutate({
       signer: {
         account: account.address,
-        // @ts-ignore - signAndSubmitTransaction exists in useWallet
-        signAndSubmitTransaction: (window as any).aptos?.signAndSubmitTransaction || (account as any).signAndSubmitTransaction
+        signAndSubmitTransaction
       },
       blobNames: [target.blobName]
     }, {
