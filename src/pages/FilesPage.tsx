@@ -5,6 +5,9 @@ import { Input } from "@/components/ui/input";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { Link } from "react-router-dom";
 import { StoredBlob } from "./UploadPage";
+import { useDeleteBlobs } from "@shelby-protocol/react";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 
 const BLOBS_STORAGE_KEY = "chainvault_blobs";
 
@@ -49,16 +52,48 @@ export default function FilesPage() {
     b.blobName.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleDelete = (idx: number) => {
-    // idx is relative to allBlobs; map to real index in storage
-    const realBlobs = getStoredBlobs();
-    const target = allBlobs[idx];
-    const realIdx = realBlobs.findIndex(
-      (b) =>
-        b.blobName === target.blobName && b.uploadedAt === target.uploadedAt
-    );
-    if (realIdx !== -1) deleteBlob(realIdx);
-    setRefresh((r) => r + 1);
+  const deleteBlobs = useDeleteBlobs({
+    onSuccess: () => {
+      toast.success("File deleted from Shelby network! 🗑️");
+      setRefresh((r) => r + 1);
+    },
+    onError: (err: any) => {
+      console.error("[ChainVault] Delete error:", err);
+      toast.error("Failed to delete from Shelby: " + (err?.message || "Unknown error"));
+    }
+  });
+
+  const handleDelete = async (idx: number) => {
+    if (!connected || !account) {
+      toast.error("Please connect your wallet first.");
+      return;
+    }
+
+    const target = filtered[idx];
+    
+    // 1. Transaction on-chain (Soft Delete)
+    deleteBlobs.mutate({
+      signer: {
+        account: account.address,
+        // @ts-ignore - signAndSubmitTransaction exists in useWallet
+        signAndSubmitTransaction: (window as any).aptos?.signAndSubmitTransaction || (account as any).signAndSubmitTransaction
+      },
+      blobNames: [target.blobName]
+    }, {
+      onSuccess: () => {
+        // 2. Clear local storage ONLY after success
+        const realBlobs = getStoredBlobs();
+        const realIdx = realBlobs.findIndex(
+          (b) => b.blobName === target.blobName && b.uploadedAt === target.uploadedAt
+        );
+        
+        if (realIdx !== -1) {
+          const blobs = getStoredBlobs();
+          blobs.splice(realIdx, 1);
+          localStorage.setItem(BLOBS_STORAGE_KEY, JSON.stringify(blobs));
+        }
+      }
+    });
   };
 
   if (!connected) {
@@ -212,10 +247,15 @@ export default function FilesPage() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                            title="Delete from local records"
+                            title="Delete from Shelby Protocol"
                             onClick={() => handleDelete(idx)}
+                            disabled={deleteBlobs.isPending}
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            {deleteBlobs.isPending ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-3.5 w-3.5" />
+                            )}
                           </Button>
                         </div>
                       </td>
