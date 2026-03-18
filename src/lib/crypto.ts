@@ -90,4 +90,4 @@ export async function decryptData(encryptedBlob: Blob, key: CryptoKey): Promise<
 /**
  * Helper to identify encrypted files in the vault.
  */
-export const ENCRYPTION_PREFIX = "ENC-v1-";
+export const ENCRYPTION_PREFIX = "shelbysecure/";

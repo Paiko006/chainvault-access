@@ -464,12 +464,16 @@ const FileTable = ({
           </thead>
           <tbody>
             {list.map((b, idx) => {
-              const cleanName = b.blob_name.includes('/') ? b.blob_name.split('/').slice(1).join('/') : b.blob_name;
+              const rawName = b.blob_name.includes('/') ? b.blob_name.split('/').slice(1).join('/') : b.blob_name;
+              const isShelbyShared = rawName.startsWith("shelbysecure/");
+              const cleanName = isShelbyShared ? rawName.replace("shelbysecure/", "") : rawName; // Keep original rawName if not shelbysecure for further checks
+              
               const isEncrypted = cleanName.startsWith(ENCRYPTION_PREFIX) || 
+                                  cleanName.startsWith("ENC-v1-") ||
                                   cleanName.startsWith("ENC:v1:") || 
                                   cleanName.toLowerCase().endsWith(".vault");
               const displayName = isEncrypted 
-                ? cleanName.replace(ENCRYPTION_PREFIX, "").replace("ENC:v1:", "").replace(/\.vault$/i, "")
+                ? cleanName.replace(ENCRYPTION_PREFIX, "").replace("ENC-v1-", "").replace("ENC:v1:", "").replace(/\.vault$/i, "")
                 : cleanName;
 
               return (

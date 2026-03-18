@@ -278,7 +278,10 @@ export default function DashboardHome() {
               </thead>
               <tbody>
                 {blobs.slice(0, 10).map((b, idx) => {
-                  const cleanName = b.blob_name.includes('/') ? b.blob_name.split('/').slice(1).join('/') : b.blob_name;
+                  const rawName = b.blob_name.includes('/') ? b.blob_name.split('/').slice(1).join('/') : b.blob_name;
+                  // Handle both shelbysecure/ folder and old ENC-v1- prefix
+                  const cleanName = rawName.replace("shelbysecure/", "").replace("ENC-v1-", "").replace(".vault", "");
+                  
                   return (
                     <tr
                       key={idx}
@@ -301,7 +304,7 @@ export default function DashboardHome() {
                       <td className="px-5 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <a 
-                            href={`https://explorer.shelby.xyz/testnet/blobs/${b.owner}?blobName=${encodeURIComponent(cleanName)}`}
+                            href={`https://explorer.shelby.xyz/testnet/blobs/${b.owner}?blobName=${encodeURIComponent(rawName)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                           >
