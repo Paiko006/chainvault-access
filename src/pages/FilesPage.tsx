@@ -47,11 +47,13 @@ export default function FilesPage() {
     }
     setDownloadingId(b.blob_name);
     try {
-      const isEncrypted = b.blob_name.startsWith(ENCRYPTION_PREFIX) || b.blob_name.startsWith("ENC:v1:");
+      // Indexer returns "@address/suffix". Strip prefix for logic.
+      const cleanName = b.blob_name.includes('/') ? b.blob_name.split('/').slice(1).join('/') : b.blob_name;
+      const isEncrypted = cleanName.startsWith(ENCRYPTION_PREFIX) || cleanName.startsWith("ENC:v1:");
       
       toast.loading(isEncrypted ? "Decrypting from Vault..." : "Downloading from Shelby...", { id: "dl-toast" });
 
-      // 1. Fetch raw data from Shelby
+      // 1. Fetch raw data from Shelby (fetchBlobData handles its own prefix stripping for the URL)
       const rawBlob = await fetchBlobData(b.blob_name, b.owner);
       
       let finalBlob = rawBlob;
@@ -69,9 +71,9 @@ export default function FilesPage() {
       const url = window.URL.createObjectURL(finalBlob);
       const a = document.createElement("a");
       a.href = url;
-      // Remove prefix for the saved filename
-      const cleanName = b.blob_name.replace(ENCRYPTION_PREFIX, "").replace("ENC:v1:", "");
-      a.download = cleanName;
+      // Remove encryption prefix for the saved filename
+      const fileNameForUser = cleanName.replace(ENCRYPTION_PREFIX, "").replace("ENC:v1:", "");
+      a.download = fileNameForUser;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -107,8 +109,13 @@ export default function FilesPage() {
     if (!blobToDelete) return;
 
     try {
+      // SDK expects the raw blob name without the "@address/" prefix
+      const cleanName = blobToDelete.blob_name.includes('/') 
+        ? blobToDelete.blob_name.split('/').slice(1).join('/') 
+        : blobToDelete.blob_name;
+
       await deleteBlobs.mutateAsync({
-        blobNames: [blobToDelete.blob_name],
+        blobNames: [cleanName],
         signer: {
           account: account.address.toString(),
           signAndSubmitTransaction,
