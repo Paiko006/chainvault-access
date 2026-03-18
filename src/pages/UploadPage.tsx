@@ -121,6 +121,13 @@ export default function UploadPage() {
           },
         ],
         expirationMicros,
+        options: {
+          build: {
+            options: {
+              maxGasAmount: 200000,
+            }
+          }
+        }
       }, {
         onSuccess: async () => {
           // Give indexer a moment to process before showing success

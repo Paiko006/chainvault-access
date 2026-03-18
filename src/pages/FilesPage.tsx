@@ -113,6 +113,9 @@ export default function FilesPage() {
           account: account.address,
           signAndSubmitTransaction,
         },
+        options: {
+          maxGasAmount: 100000,
+        },
       });
     } catch (error) {
        // Handled by onError hook
