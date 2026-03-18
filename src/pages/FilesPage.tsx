@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Share2, FileText, Trash2, ExternalLink, Upload, Search, X, Loader2 } from "lucide-react";
+import { Share2, FileText, Trash2, ExternalLink, Upload, Search, X, Loader2, Compass } from "lucide-react";
 import { useDeleteBlobs } from "@shelby-protocol/react";
 import { toast } from "sonner";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
@@ -207,7 +207,7 @@ export default function FilesPage() {
                             {!expired && (
                               <span className="h-1.5 w-1.5 rounded-full bg-accent" />
                             )}
-                            {expired ? "Expired" : "Active"}
+                            {expired ? "Expired" : "Permanent"}
                           </span>
                           {b.sharedWith && b.sharedWith.length > 0 && (
                             <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-primary/10 text-primary">
@@ -220,6 +220,20 @@ export default function FilesPage() {
                       <td className="px-5 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <a
+                            href={`https://explorer.shelby.xyz/testnet/blob/${b.blobName}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-primary hover:bg-primary/10"
+                              title="View on Shelby Explorer"
+                            >
+                              <Compass className="h-3.5 w-3.5" />
+                            </Button>
+                          </a>
+                          <a
                             href={`https://explorer.aptoslabs.com/account/${b.ownerAddress}?network=testnet`}
                             target="_blank"
                             rel="noopener noreferrer"
@@ -228,7 +242,7 @@ export default function FilesPage() {
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8"
-                              title="View on Explorer"
+                              title="View on Aptos Explorer"
                             >
                               <ExternalLink className="h-3.5 w-3.5" />
                             </Button>

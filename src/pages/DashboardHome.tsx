@@ -4,17 +4,7 @@ import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { useAptBalance } from "@aptos-labs/react";
 import { Link } from "react-router-dom";
 import { shortenAddress } from "@/lib/wallet";
-import { StoredBlob } from "./UploadPage";
-
-const BLOBS_STORAGE_KEY = "chainvault_blobs";
-
-function getStoredBlobs(): StoredBlob[] {
-  try {
-    return JSON.parse(localStorage.getItem(BLOBS_STORAGE_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
+import { StoredBlob, getStoredBlobs, BLOBS_STORAGE_KEY } from "@/types/storage";
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -114,15 +104,26 @@ export default function DashboardHome() {
             Aptos Testnet
           </span>
           {account && (
-            <a
-              href={`https://explorer.aptoslabs.com/account/${account.address}?network=testnet`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs font-mono text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {shortenAddress(account.address.toString())}
-              <ExternalLink className="h-3 w-3" />
-            </a>
+            <div className="flex flex-col items-end gap-1">
+              <a
+                href={`https://explorer.shelby.xyz/testnet/account/${account.address}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-[10px] font-mono text-primary hover:underline transition-all"
+              >
+                Shelby Explorer
+                <ExternalLink className="h-2.5 w-2.5" />
+              </a>
+              <a
+                href={`https://explorer.aptoslabs.com/account/${account.address}?network=testnet`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-[10px] font-mono text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {shortenAddress(account.address.toString())}
+                <ExternalLink className="h-2.5 w-2.5" />
+              </a>
+            </div>
           )}
         </div>
       </div>
@@ -206,7 +207,7 @@ export default function DashboardHome() {
                               : "bg-accent/10 text-accent"
                           }`}
                         >
-                          {expired ? "Expired" : "Active"}
+                          {expired ? "Expired" : "Permanent"}
                         </span>
                       </td>
                     </tr>

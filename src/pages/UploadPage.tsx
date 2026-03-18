@@ -24,7 +24,7 @@ export default function UploadPage() {
   const [wallets, setWallets] = useState<string[]>([""]);
   const { account, signAndSubmitTransaction, connected } = useWallet();
 
-  const expirationMicros = (Date.now() + 86_400_000) * 1000; // 24 hours from now
+  const expirationMicros = (Date.now() + 100 * 365 * 24 * 60 * 60 * 1000) * 1000; // ~100 years from now (Permanent)
 
   const uploadBlobs = useUploadBlobs({
     onSuccess: () => {

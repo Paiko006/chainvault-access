@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   Settings,
   Lock,
+  Compass,
 } from "lucide-react";
 
 const nav = [
@@ -17,6 +18,7 @@ const nav = [
   { title: "Shared Files", to: "/dashboard/shared", icon: Share2 },
   { title: "Access Control", to: "/dashboard/access", icon: ShieldCheck },
   { title: "Settings", to: "/dashboard/settings", icon: Settings },
+  { title: "Network Explorer", to: "/dashboard/explorer", icon: Compass },
 ];
 
 export function AppSidebar() {

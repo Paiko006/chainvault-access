@@ -12,6 +12,7 @@ import FilesPage from "./pages/FilesPage.tsx";
 import SharedPage from "./pages/SharedPage.tsx";
 import AccessControlPage from "./pages/AccessControlPage.tsx";
 import SettingsPage from "./pages/SettingsPage.tsx";
+import ExplorerPage from "./pages/ExplorerPage.tsx";
 import LockerPage from "./pages/LockerPage.tsx";
 
 import { Network } from "@aptos-labs/ts-sdk";
@@ -89,6 +90,7 @@ const App = () => {
                     <Route path="shared" element={<SharedPage />} />
                     <Route path="access" element={<AccessControlPage />} />
                     <Route path="settings" element={<SettingsPage />} />
+                    <Route path="explorer" element={<ExplorerPage />} />
                   </Route>
                   <Route path="/locker" element={<LockerPage />} />
                   <Route path="*" element={<NotFound />} />
