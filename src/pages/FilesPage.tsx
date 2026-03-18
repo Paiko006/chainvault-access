@@ -47,7 +47,7 @@ export default function FilesPage() {
     }
     setDownloadingId(b.blob_name);
     try {
-      const isEncrypted = b.blob_name.startsWith(ENCRYPTION_PREFIX);
+      const isEncrypted = b.blob_name.startsWith(ENCRYPTION_PREFIX) || b.blob_name.startsWith("ENC:v1:");
       
       toast.loading(isEncrypted ? "Decrypting from Vault..." : "Downloading from Shelby...", { id: "dl-toast" });
 
@@ -70,7 +70,7 @@ export default function FilesPage() {
       const a = document.createElement("a");
       a.href = url;
       // Remove prefix for the saved filename
-      const cleanName = isEncrypted ? b.blob_name.replace(ENCRYPTION_PREFIX, "") : b.blob_name;
+      const cleanName = b.blob_name.replace(ENCRYPTION_PREFIX, "").replace("ENC:v1:", "");
       a.download = cleanName;
       document.body.appendChild(a);
       a.click();
@@ -238,7 +238,10 @@ export default function FilesPage() {
               </thead>
               <tbody>
                 {filtered.map((b, idx) => {
-                  const isEncrypted = b.blob_name.startsWith(ENCRYPTION_PREFIX);
+                  const isEncrypted = b.blob_name.startsWith(ENCRYPTION_PREFIX) || b.blob_name.startsWith("ENC:v1:");
+                  const displayName = isEncrypted 
+                    ? b.blob_name.replace(ENCRYPTION_PREFIX, "").replace("ENC:v1:", "") 
+                    : b.blob_name;
                   const isDownloading = downloadingId === b.blob_name;
 
                   return (
