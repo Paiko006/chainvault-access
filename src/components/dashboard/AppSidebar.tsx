@@ -30,7 +30,7 @@ export function AppSidebar() {
         <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
           <Lock className="h-4 w-4 text-primary-foreground" />
         </div>
-        <span className="font-display font-bold text-lg text-sidebar-accent-foreground">ChainLocker</span>
+        <span className="font-display font-bold text-lg text-sidebar-accent-foreground">ShelbySecure</span>
       </Link>
 
       <nav className="flex-1 px-3 py-4 space-y-1">

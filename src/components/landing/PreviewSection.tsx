@@ -27,7 +27,7 @@ export function PreviewSection() {
                 <div className="w-3 h-3 rounded-full bg-yellow-500/60" />
                 <div className="w-3 h-3 rounded-full bg-green-500/60" />
               </div>
-              <div className="text-xs text-muted-foreground ml-2">chainlocker.app/dashboard</div>
+              <div className="text-xs text-muted-foreground ml-2">shelbysecure.app/dashboard</div>
             </div>
             <div className="p-6">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">

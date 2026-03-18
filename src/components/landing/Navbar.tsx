@@ -10,7 +10,7 @@ export function Navbar() {
           <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
             <Lock className="h-4 w-4 text-primary-foreground" />
           </div>
-          <span className="font-display font-bold text-lg">ChainLocker</span>
+          <span className="font-display font-bold text-lg">ShelbySecure</span>
         </Link>
 
         <div className="hidden md:flex items-center gap-8">

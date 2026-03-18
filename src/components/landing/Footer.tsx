@@ -15,7 +15,7 @@ export function Footer() {
           <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
             <Lock className="h-4 w-4 text-primary-foreground" />
           </div>
-          <span className="font-display font-bold text-lg">ChainLocker</span>
+          <span className="font-display font-bold text-lg">ShelbySecure</span>
         </div>
 
         <div className="flex items-center gap-8">
@@ -26,7 +26,7 @@ export function Footer() {
           ))}
         </div>
 
-        <p className="text-xs text-muted-foreground">© 2026 ChainLocker. All rights reserved.</p>
+        <p className="text-xs text-muted-foreground">© 2026 ShelbySecure. All rights reserved.</p>
       </div>
     </footer>
   );
