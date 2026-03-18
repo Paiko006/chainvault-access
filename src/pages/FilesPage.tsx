@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
-import { Share2, FileText, Trash2, ExternalLink, Upload, Search, X, Loader2, Compass, RefreshCw } from "lucide-react";
+import { Share2, FileText, Trash2, ExternalLink, Upload, Search, X, Loader2, Compass, RefreshCw, Download, Lock } from "lucide-react";
 import { useDeleteBlobs } from "@shelby-protocol/react";
 import { toast } from "sonner";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { fetchAccountBlobs, ShelbyBlob, formatBytes, fromShelbyTimestamp } from "@/lib/shelby-indexer";
+import { fetchAccountBlobs, ShelbyBlob, formatBytes, fromShelbyTimestamp, fetchBlobData } from "@/lib/shelby-indexer";
+import { getVaultKey, decryptData, ENCRYPTION_PREFIX } from "@/lib/crypto";
 
 export default function FilesPage() {
   const { connected, account, signAndSubmitTransaction } = useWallet();
@@ -14,6 +15,7 @@ export default function FilesPage() {
   const [blobs, setBlobs] = useState<ShelbyBlob[]>([]);
   const [loading, setLoading] = useState(false);
   const [refresh, setRefresh] = useState(0);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -37,6 +39,51 @@ export default function FilesPage() {
   const filtered = blobs.filter((b) =>
     b.blob_name.toLowerCase().includes(search.toLowerCase())
   );
+
+  const handleDownload = async (b: ShelbyBlob) => {
+    if (!account) {
+      toast.error("Please connect your wallet first");
+      return;
+    }
+    setDownloadingId(b.blob_name);
+    try {
+      const isEncrypted = b.blob_name.startsWith(ENCRYPTION_PREFIX);
+      
+      toast.loading(isEncrypted ? "Decrypting from Vault..." : "Downloading from Shelby...", { id: "dl-toast" });
+
+      // 1. Fetch raw data from Shelby
+      const rawBlob = await fetchBlobData(b.blob_name);
+      
+      let finalBlob = rawBlob;
+
+      // 2. Decrypt if needed
+      if (isEncrypted) {
+        const key = await getVaultKey(account.address.toString());
+        finalBlob = await decryptData(rawBlob, key);
+        toast.success("File decrypted successfully! 🔓", { id: "dl-toast" });
+      } else {
+        toast.success("Download complete!", { id: "dl-toast" });
+      }
+
+      // 3. Trigger Download
+      const url = window.URL.createObjectURL(finalBlob);
+      const a = document.createElement("a");
+      a.href = url;
+      // Remove prefix for the saved filename
+      const cleanName = isEncrypted ? b.blob_name.replace(ENCRYPTION_PREFIX, "") : b.blob_name;
+      a.download = cleanName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+    } catch (err) {
+      console.error("Download/Decrypt error:", err);
+      toast.error("Failed to process file. Check your vault key.", { id: "dl-toast" });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   const deleteBlobs = useDeleteBlobs({
     onSuccess: () => {
@@ -184,6 +231,9 @@ export default function FilesPage() {
               </thead>
               <tbody>
                 {filtered.map((b, idx) => {
+                  const isEncrypted = b.blob_name.startsWith(ENCRYPTION_PREFIX);
+                  const isDownloading = downloadingId === b.blob_name;
+
                   return (
                     <tr
                       key={b.blob_name}
@@ -191,12 +241,24 @@ export default function FilesPage() {
                     >
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-2">
-                          <div className="h-8 w-8 rounded bg-primary/10 flex items-center justify-center">
+                          <div className="h-8 w-8 rounded bg-primary/10 flex items-center justify-center relative">
                             <FileText className="h-4 w-4 text-primary shrink-0" />
+                            {isEncrypted && (
+                              <div className="absolute -top-1 -right-1 bg-accent rounded-full p-0.5 border border-background">
+                                <Lock className="h-2 w-2 text-white" />
+                              </div>
+                            )}
                           </div>
-                          <span className="font-medium text-foreground truncate max-w-[200px]" title={b.blob_name}>
-                            {b.blob_name.split('/').pop()}
-                          </span>
+                          <div className="flex flex-col">
+                            <span className="font-medium text-foreground truncate max-w-[200px]" title={b.blob_name}>
+                              {b.blob_name.replace(ENCRYPTION_PREFIX, "").split('/').pop()}
+                            </span>
+                            {isEncrypted && (
+                              <span className="text-[9px] text-accent font-bold uppercase tracking-tighter">
+                                Encrypted Vault
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="px-5 py-3.5 text-muted-foreground hidden sm:table-cell">
@@ -213,6 +275,20 @@ export default function FilesPage() {
                       </td>
                       <td className="px-5 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-accent hover:bg-accent/10"
+                            title="Decrypt & Download"
+                            onClick={() => handleDownload(b)}
+                            disabled={!!downloadingId}
+                          >
+                            {isDownloading ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Download className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
                           <a
                             href={`https://explorer.shelby.xyz/testnet/blob/${b.blob_name}`}
                             target="_blank"

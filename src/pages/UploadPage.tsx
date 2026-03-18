@@ -18,32 +18,29 @@ function saveToLocalStorage(blob: StoredBlob) {
   }
 }
 
+import { getVaultKey, encryptData, ENCRYPTION_PREFIX } from "@/lib/crypto";
+
 export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [wallets, setWallets] = useState<string[]>([""]);
+  const [isEncrypting, setIsEncrypting] = useState(false);
   const { account, signAndSubmitTransaction, connected } = useWallet();
 
   const expirationMicros = (Date.now() + 100 * 365 * 24 * 60 * 60 * 1000) * 1000; // ~100 years from now (Permanent)
 
   const uploadBlobs = useUploadBlobs({
     onSuccess: () => {
-      // Logic moved to mutate call for access to safeFileName
+      // Logic moved to mutate call
     },
     onError: (error: any) => {
       console.error("[ChainVault] Upload error:", error);
       const msg = error?.message || "";
       const status = error?.response?.status;
+      setIsEncrypting(false);
 
       if (status === 401 || msg.includes("401") || msg.includes("Unauthorized")) {
-        toast.error(
-          "🔐 Auth Error (401): Masalah API Key atau Whitelist Origin."
-        );
-        console.error("ANALISIS: Geomi menolak request. Pastikan 'http://localhost:8080' sudah Anda tambahkan ke 'Allowed Origins' di dashboard geomi.dev untuk key ini.");
-      } else if (status === 403) {
-        toast.error("Forbidden (403): Origin tidak diizinkan oleh Geomi.");
-      } else if (msg.includes("500")) {
-        toast.error("Shelby server error (500). Try again shortly.");
+        toast.error("🔐 Auth Error: Check API Key/Whitelist.");
       } else {
         toast.error("Upload failed: " + (msg || "Unknown error"));
       }
@@ -85,26 +82,33 @@ export default function UploadPage() {
     }
 
     const apiKey = import.meta.env.VITE_SHELBY_API_KEY;
-    if (!apiKey || apiKey.trim() === "" || apiKey.includes("XXXXXXXX")) {
-      toast.error("VITE_SHELBY_API_KEY belum diisi di .env");
+    if (!apiKey) {
+      toast.error("API Key missing.");
       return;
     }
 
     try {
+      setIsEncrypting(true);
+      
+      // 1. Get/Derive Vault Key
+      const vaultKey = await getVaultKey(account.address.toString());
+      
+      // 2. Encrypt Data
       const arrayBuffer = await file.arrayBuffer();
-      const fileData = new Uint8Array(arrayBuffer);
+      const encryptedBlob = await encryptData(arrayBuffer, vaultKey);
+      const encryptedData = new Uint8Array(await encryptedBlob.arrayBuffer());
 
-      // Safe filename: alphanumeric + timestamp
+      // 3. Prepare Safe Filename with Encryption Prefix
       const baseName = file.name
         .replace(/\.[^.]+$/, "")
         .replace(/[^a-zA-Z0-9_-]/g, "_")
-        .slice(0, 40);
-      const ext = file.name.includes(".")
-        ? file.name.split(".").pop()
-        : "bin";
-      const safeFileName = `${baseName}_${Date.now()}.${ext}`;
+        .slice(0, 30);
+      const ext = file.name.includes(".") ? file.name.split(".").pop() : "bin";
+      
+      // Mark as encrypted so FilesPage knows how to handle it
+      const safeFileName = `${ENCRYPTION_PREFIX}${baseName}_${Date.now()}.${ext}`;
 
-      // Signer format per Shelby docs (Wallet Adapter example)
+      // 4. Submit to Shelby
       uploadBlobs.mutate({
         signer: {
           account: account.address,
@@ -113,13 +117,13 @@ export default function UploadPage() {
         blobs: [
           {
             blobName: safeFileName,
-            blobData: fileData,
+            blobData: encryptedData,
           },
         ],
         expirationMicros,
       }, {
         onSuccess: () => {
-          // Filter out empty wallets
+          setIsEncrypting(false);
           const sharedWith = wallets.filter(w => w.trim() !== "");
           
           saveToLocalStorage({
@@ -130,14 +134,15 @@ export default function UploadPage() {
             expirationMicros,
             sharedWith,
           });
-          toast.success("File successfully secured on Shelby testnet! ✅");
+          toast.success("Private file secured & encrypted! 🔒✅");
           setFile(null);
-          setWallets([""]); // Reset shared list
+          setWallets([""]);
         }
       });
     } catch (err) {
-      console.error("[ChainVault] Error preparing file:", err);
-      toast.error("Error reading file data.");
+      setIsEncrypting(false);
+      console.error("[ChainVault] Encryption/Upload Error:", err);
+      toast.error("Process failed: Encryption error.");
     }
   };
 
@@ -286,10 +291,15 @@ export default function UploadPage() {
         variant="hero"
         size="lg"
         className="w-full rounded-xl py-6"
-        disabled={!file || !connected || uploadBlobs.isPending}
+        disabled={!file || !connected || uploadBlobs.isPending || isEncrypting}
         onClick={handleUpload}
       >
-        {uploadBlobs.isPending ? (
+        {isEncrypting ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Encrypting Vault…
+          </>
+        ) : uploadBlobs.isPending ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             Securing on testnet…
@@ -302,14 +312,16 @@ export default function UploadPage() {
         ) : (
           <>
             <Upload className="mr-2 h-4 w-4" />
-            Upload & Secure File
+            Upload & Secure Private File
           </>
         )}
       </Button>
 
-      {uploadBlobs.isPending && (
+      {(uploadBlobs.isPending || isEncrypting) && (
         <p className="text-center text-xs text-muted-foreground animate-pulse">
-          Encoding with erasure coding → registering on-chain → uploading blob…
+          {isEncrypting 
+            ? "AES-GCM encryption in progress at source..." 
+            : "Registering on-chain → uploading encrypted blob…"}
         </p>
       )}
     </div>

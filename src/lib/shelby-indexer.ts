@@ -61,6 +61,16 @@ export async function fetchAccountBlobs(owner: string, apiKey?: string): Promise
 }
 
 /**
+ * Fetches raw blob data from the Shelby network for decryption.
+ */
+export async function fetchBlobData(blobName: string): Promise<Blob> {
+  const url = `https://api.testnet.aptoslabs.com/nocode/v1/public/alias/shelby/testnet/v1/blob/${blobName}`;
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Failed to fetch blob data");
+  return await response.blob();
+}
+
+/**
  * Helper to convert Shelby microsecond timestamps to JS Date objects
  */
 export function fromShelbyTimestamp(micros: string | number): Date {
