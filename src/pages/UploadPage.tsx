@@ -111,7 +111,7 @@ export default function UploadPage() {
       // 4. Submit to Shelby
       uploadBlobs.mutate({
         signer: {
-          account: account.address,
+          account: account.address.toString(),
           signAndSubmitTransaction,
         },
         blobs: [

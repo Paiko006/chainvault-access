@@ -63,10 +63,10 @@ export async function fetchAccountBlobs(owner: string, apiKey?: string): Promise
 /**
  * Fetches raw blob data from the Shelby network for decryption.
  */
-export async function fetchBlobData(blobName: string): Promise<Blob> {
+export async function fetchBlobData(blobName: string, owner: string): Promise<Blob> {
   const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || "AG-7FPFEZSPINUP4F7HKVSIO1ZPOEDZ8E5WN";
-  // Important: URI encode the blob name because it contains colons (ENC:v1:)
-  const url = `https://api.testnet.aptoslabs.com/nocode/v1/public/alias/shelby/testnet/v1/blob/${encodeURIComponent(blobName)}`;
+  // Official Shelby Gateway URL: https://api.testnet.shelby.xyz/shelby/v1/blobs/{owner}/{blobName}
+  const url = `https://api.testnet.shelby.xyz/shelby/v1/blobs/${owner}/${encodeURIComponent(blobName)}`;
 
   const maxAttempts = 3;
   const delayMs = 2000;

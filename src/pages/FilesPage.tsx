@@ -52,7 +52,7 @@ export default function FilesPage() {
       toast.loading(isEncrypted ? "Decrypting from Vault..." : "Downloading from Shelby...", { id: "dl-toast" });
 
       // 1. Fetch raw data from Shelby
-      const rawBlob = await fetchBlobData(b.blob_name);
+      const rawBlob = await fetchBlobData(b.blob_name, b.owner);
       
       let finalBlob = rawBlob;
 
@@ -110,7 +110,7 @@ export default function FilesPage() {
       await deleteBlobs.mutateAsync({
         blobNames: [blobToDelete.blob_name],
         signer: {
-          account: account.address,
+          account: account.address.toString(),
           signAndSubmitTransaction,
         },
         options: {
@@ -300,7 +300,7 @@ export default function FilesPage() {
                             )}
                           </Button>
                           <a
-                            href={`https://explorer.shelby.xyz/testnet/blob/${encodeURIComponent(b.blob_name)}`}
+                            href={`https://explorer.shelby.xyz/testnet/blobs/${b.owner}?blobName=${encodeURIComponent(b.blob_name)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                           >
