@@ -1,23 +1,68 @@
 import { useState, useEffect } from "react";
-import { Share2, FileText, Trash2, ExternalLink, Upload, Search, X, Loader2, Compass, RefreshCw, Download, Lock } from "lucide-react";
+import { 
+  Share2, 
+  FileText, 
+  Trash2, 
+  ExternalLink, 
+  Upload, 
+  Search, 
+  X, 
+  Loader2, 
+  Compass, 
+  RefreshCw, 
+  Download, 
+  Lock,
+  Users,
+  Key,
+  Shield,
+  Clock,
+  Database,
+  Eye
+} from "lucide-react";
 import { useDeleteBlobs } from "@shelby-protocol/react";
 import { toast } from "sonner";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { fetchAccountBlobs, ShelbyBlob, formatBytes, fromShelbyTimestamp, fetchBlobData } from "@/lib/shelby-indexer";
+import { 
+  fetchAccountBlobs, 
+  ShelbyBlob, 
+  formatBytes, 
+  fromShelbyTimestamp, 
+  fetchBlobData,
+  fetchSharedBlobs 
+} from "@/lib/shelby-indexer";
 import { getVaultKey, decryptData, ENCRYPTION_PREFIX } from "@/lib/crypto";
 import { useNotifications } from "@/hooks/use-notifications";
+import { 
+  Tabs, 
+  TabsContent, 
+  TabsList, 
+  TabsTrigger 
+} from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function FilesPage() {
   const { connected, account, signAndSubmitTransaction } = useWallet();
   const { addNotification } = useNotifications();
   const [search, setSearch] = useState("");
   const [blobs, setBlobs] = useState<ShelbyBlob[]>([]);
+  const [sharedBlobs, setSharedBlobs] = useState<ShelbyBlob[]>([]);
   const [loading, setLoading] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  // Decryption Modal State for Shared Files
+  const [isDecryptModalOpen, setIsDecryptModalOpen] = useState(false);
+  const [activeSharedBlob, setActiveSharedBlob] = useState<ShelbyBlob | null>(null);
+  const [manualKey, setManualKey] = useState("");
 
   useEffect(() => {
     async function loadData() {
@@ -25,8 +70,12 @@ export default function FilesPage() {
         setLoading(true);
         try {
           const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || "";
-          const data = await fetchAccountBlobs(account.address.toString(), apiKey);
-          setBlobs(data);
+          const [myFiles, sharedFiles] = await Promise.all([
+            fetchAccountBlobs(account.address.toString(), apiKey),
+            fetchSharedBlobs(account.address.toString(), apiKey)
+          ]);
+          setBlobs(myFiles);
+          setSharedBlobs(sharedFiles);
         } catch (err) {
           console.error("Failed to fetch files:", err);
           toast.error("Failed to sync with Shelby network");
@@ -90,6 +139,51 @@ export default function FilesPage() {
       console.error("[ChainVault] Download/Decrypt error:", err);
       const errorMsg = err?.message || "Check your vault key or internet connection.";
       toast.error(`Error: ${errorMsg}`, { id: "dl-toast" });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const handleSharedDownload = async () => {
+    if (!activeSharedBlob || !manualKey || !account) return;
+    
+    setDownloadingId(activeSharedBlob.blob_name);
+    setIsDecryptModalOpen(false);
+    
+    try {
+      const cleanName = activeSharedBlob.blob_name.includes('/') 
+        ? activeSharedBlob.blob_name.split('/').slice(1).join('/') 
+        : activeSharedBlob.blob_name;
+      
+      toast.loading("Fetching & Decrypting shared asset...", { id: "dl-shared-toast" });
+
+      // 1. Fetch raw data
+      const rawBlob = await fetchBlobData(activeSharedBlob.blob_name, activeSharedBlob.owner);
+      
+      // 2. Use manual key provided by owner
+      const key = await getVaultKey(manualKey);
+      const finalBlob = await decryptData(rawBlob, key);
+      
+      toast.success("Shared file decrypted successfully! 🔓", { id: "dl-shared-toast" });
+
+      // 3. Download
+      const url = window.URL.createObjectURL(finalBlob);
+      const a = document.createElement("a");
+      a.href = url;
+      const fileNameForUser = cleanName
+        .replace(ENCRYPTION_PREFIX, "")
+        .replace("ENC:v1:", "")
+        .replace(/\.vault$/i, "");
+      a.download = `shared-${fileNameForUser}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      setManualKey("");
+    } catch (err: any) {
+      console.error("[ChainVault] Shared Download error:", err);
+      toast.error("Decryption failed. Please verify the owner's vault key.", { id: "dl-shared-toast" });
     } finally {
       setDownloadingId(null);
     }
@@ -189,15 +283,37 @@ export default function FilesPage() {
         </div>
       </div>
 
+      {/* Stats Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="glass-card p-4 rounded-xl border-primary/10 flex items-center gap-4">
+          <div className="h-10 w-10 rounded-lg bg-primary/5 flex items-center justify-center text-primary">
+            <Database className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-[10px] uppercase font-bold text-muted-foreground">My Assets</p>
+            <p className="text-xl font-bold">{blobs.length}</p>
+          </div>
+        </div>
+        <div className="glass-card p-4 rounded-xl border-accent/10 flex items-center gap-4">
+          <div className="h-10 w-10 rounded-lg bg-accent/5 flex items-center justify-center text-accent">
+            <Users className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-[10px] uppercase font-bold text-muted-foreground">Shared</p>
+            <p className="text-xl font-bold">{sharedBlobs.length}</p>
+          </div>
+        </div>
+      </div>
+
       {/* Search */}
-      {(blobs.length > 0 || search) && (
+      {(blobs.length > 0 || sharedBlobs.length > 0 || search) && (
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search assets..."
-            className="pl-9 bg-secondary/50 border-border/50"
+            className="pl-9 bg-secondary/30 border-border/50 h-11 rounded-xl"
           />
           {search && (
             <button
@@ -210,167 +326,210 @@ export default function FilesPage() {
         </div>
       )}
 
-      {loading && blobs.length === 0 ? (
-        <div className="py-20 flex flex-col items-center justify-center gap-4">
-           <Loader2 className="h-10 w-10 text-primary animate-spin" />
-           <p className="text-sm text-muted-foreground animate-pulse font-bold uppercase tracking-widest">
-             Connecting to Shelby Indexer...
-           </p>
-        </div>
-      ) : blobs.length === 0 ? (
-        <div className="glass-card p-14 text-center rounded-xl space-y-4">
-          <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center mx-auto">
-            <FileText className="h-6 w-6 text-muted-foreground" />
-          </div>
-          <p className="text-muted-foreground text-sm">
-            No files found on Shelby Explorer for this account.
-          </p>
-          <Link to="/dashboard/upload">
-            <Button variant="hero" size="sm" className="gap-2">
-              <Upload className="h-3.5 w-3.5" />
-              Upload First File
-            </Button>
-          </Link>
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="glass-card p-12 text-center rounded-xl">
-          <p className="text-muted-foreground text-sm">
-            No assets match "{search}".
-          </p>
-        </div>
-      ) : (
-        <div className="glass-card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border/30 text-muted-foreground">
-                  <th className="text-left px-5 py-3 font-medium uppercase text-[10px]">Asset Name</th>
-                  <th className="text-left px-5 py-3 font-medium hidden sm:table-cell uppercase text-[10px]">
-                    Capacity
-                  </th>
-                  <th className="text-left px-5 py-3 font-medium hidden md:table-cell uppercase text-[10px]">
-                    Created At
-                  </th>
-                  <th className="text-left px-5 py-3 font-medium uppercase text-[10px]">Status</th>
-                  <th className="text-right px-5 py-3 font-medium uppercase text-[10px]">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((b, idx) => {
-                  const cleanName = b.blob_name.includes('/') ? b.blob_name.split('/').slice(1).join('/') : b.blob_name;
-                  const isEncrypted = cleanName.startsWith(ENCRYPTION_PREFIX) || 
-                                      cleanName.startsWith("ENC:v1:") || 
-                                      cleanName.toLowerCase().endsWith(".vault");
-                  const displayName = isEncrypted 
-                    ? cleanName.replace(ENCRYPTION_PREFIX, "").replace("ENC:v1:", "").replace(/\.vault$/i, "")
-                    : cleanName;
-                  const isDownloading = downloadingId === b.blob_name;
+      <Tabs defaultValue="my-vault" className="w-full">
+        <TabsList className="grid w-[400px] grid-cols-2 bg-muted/30 rounded-xl p-1 mb-6">
+          <TabsTrigger value="my-vault" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            My Private Vault
+          </TabsTrigger>
+          <TabsTrigger value="shared" className="rounded-lg data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
+            Shared with Me
+          </TabsTrigger>
+        </TabsList>
 
-                  return (
-                    <tr
-                      key={b.blob_name}
-                      className="border-b border-border/20 hover:bg-muted/20 transition-colors"
-                    >
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-2">
-                          <div className="h-8 w-8 rounded bg-primary/10 flex items-center justify-center relative">
-                            <FileText className="h-4 w-4 text-primary shrink-0" />
-                            {isEncrypted && (
-                              <div className="absolute -top-1 -right-1 bg-accent rounded-full p-0.5 border border-background">
-                                <Lock className="h-2 w-2 text-white" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="font-medium text-foreground truncate max-w-[200px]" title={cleanName}>
-                              {displayName}
-                            </span>
-                            {isEncrypted && (
-                              <span className="text-[9px] text-accent font-bold uppercase tracking-tighter">
-                                Encrypted Vault
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3.5 text-muted-foreground hidden sm:table-cell">
-                        {formatBytes(b.size)}
-                      </td>
-                      <td className="px-5 py-3.5 text-muted-foreground hidden md:table-cell">
-                        {fromShelbyTimestamp(b.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-accent/10 text-accent">
-                          <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-                          1 Year Vault
-                        </span>
-                      </td>
-                      <td className="px-5 py-3.5 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-accent hover:bg-accent/10"
-                            title="Decrypt & Download"
-                            onClick={() => handleDownload(b)}
-                            disabled={!!downloadingId}
-                          >
-                            {isDownloading ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Download className="h-3.5 w-3.5" />
-                            )}
-                          </Button>
-                          <a
-                            href={`https://explorer.shelby.xyz/testnet/blobs/${b.owner}?blobName=${encodeURIComponent(cleanName)}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-primary hover:bg-primary/10"
-                              title="View on Shelby Explorer"
-                            >
-                              <Compass className="h-3.5 w-3.5" />
-                            </Button>
-                          </a>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                            title="Delete from Shelby Protocol"
-                            onClick={() => handleDelete(idx)}
-                            disabled={deleteBlobs.isPending}
-                          >
-                            {deleteBlobs.isPending ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-3.5 w-3.5" />
-                            )}
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        <TabsContent value="my-vault" className="space-y-4">
+          {loading && blobs.length === 0 ? (
+            <div className="py-20 flex flex-col items-center justify-center gap-4">
+              <Loader2 className="h-10 w-10 text-primary animate-spin" />
+              <p className="text-sm text-muted-foreground animate-pulse font-bold uppercase tracking-widest">
+                Connecting to Shelby Indexer...
+              </p>
+            </div>
+          ) : blobs.length === 0 ? (
+            <div className="glass-card p-14 text-center rounded-xl space-y-4">
+              <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center mx-auto">
+                <FileText className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <p className="text-muted-foreground text-sm">No files found on Shelby Explorer.</p>
+            </div>
+          ) : (
+            <FileTable list={filtered} onDownload={handleDownload} onDelete={handleDelete} />
+          )}
+        </TabsContent>
+
+        <TabsContent value="shared" className="space-y-4">
+          {loading && sharedBlobs.length === 0 ? (
+            <div className="py-20 flex flex-col items-center justify-center gap-4">
+              <Loader2 className="h-10 w-10 text-accent animate-spin" />
+              <p className="text-sm text-muted-foreground animate-pulse font-bold uppercase tracking-widest">
+                Searching Shared Index...
+              </p>
+            </div>
+          ) : sharedBlobs.length === 0 ? (
+            <div className="glass-card p-14 text-center rounded-xl border-dashed border-2 border-border/50">
+              <div className="h-12 w-12 rounded-xl bg-accent/10 flex items-center justify-center mx-auto mb-4">
+                <Users className="h-6 w-6 text-accent" />
+              </div>
+              <p className="text-muted-foreground text-sm">No shared assets discovered for your address.</p>
+            </div>
+          ) : (
+            <FileTable 
+              list={sharedBlobs.filter(b => b.blob_name.toLowerCase().includes(search.toLowerCase()))} 
+              onDownload={(b) => {
+                setActiveSharedBlob(b);
+                setIsDecryptModalOpen(true);
+              }}
+              isShared 
+            />
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Decryption Dialog for Shared Files */}
+      <Dialog open={isDecryptModalOpen} onOpenChange={setIsDecryptModalOpen}>
+        <DialogContent className="sm:max-w-[425px] glass-card border-border/50 backdrop-blur-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Key className="h-5 w-5 text-accent" />
+              Security Authorization
+            </DialogTitle>
+            <DialogDescription className="text-xs pt-1">
+              File <span className="text-foreground font-mono font-bold">"{activeSharedBlob?.blob_name.split('/').pop()?.replace('.vault','')}"</span> is encrypted.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                Decryption Context (Owner's Vault Key)
+              </label>
+              <Input
+                type="password"
+                placeholder="Enter the key provided by the owner..."
+                value={manualKey}
+                onChange={(e) => setManualKey(e.target.value)}
+                className="bg-muted/10 border-border/50"
+              />
+            </div>
+            <div className="bg-accent/5 border border-accent/20 p-4 rounded-xl flex gap-3">
+              <Eye className="h-5 w-5 text-accent shrink-0" />
+              <p className="text-[10px] text-accent-foreground leading-relaxed">
+                Shared files require the original vault key for end-to-end decryption.
+              </p>
+            </div>
           </div>
-          <div className="px-5 py-3 border-t border-border/30 text-xs text-muted-foreground flex justify-between items-center">
-            <span>{filtered.length} Asset{filtered.length !== 1 ? "s" : ""} Found</span>
-            <a
-              href={`https://explorer.shelby.xyz/testnet/account/${account?.address}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-foreground inline-flex items-center gap-1 font-bold text-primary transition-all"
+          <div className="flex gap-2 justify-end">
+            <Button variant="ghost" className="rounded-lg" onClick={() => setIsDecryptModalOpen(false)}>Cancel</Button>
+            <Button 
+                onClick={handleSharedDownload}
+                disabled={!manualKey || !!downloadingId}
+                className="bg-accent hover:bg-accent/80 text-accent-foreground rounded-lg"
             >
-              Verify on Shelby Indexer
-              <ExternalLink className="h-3 w-3" />
-            </a>
+                {downloadingId === activeSharedBlob?.blob_name ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Download className="h-4 w-4 mr-2" />
+                )}
+                Verify & Decrypt
+            </Button>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
+const FileTable = ({ 
+  list, 
+  onDownload, 
+  onDelete, 
+  isShared 
+}: { 
+  list: ShelbyBlob[], 
+  onDownload: (b: ShelbyBlob) => void, 
+  onDelete?: (idx: number) => void,
+  isShared?: boolean
+}) => {
+  return (
+    <div className="glass-card overflow-hidden rounded-2xl border-border/40">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border/30 text-muted-foreground">
+              <th className="text-left px-5 py-3 font-medium uppercase text-[10px]">Asset Name</th>
+              <th className="text-left px-5 py-3 font-medium hidden sm:table-cell uppercase text-[10px]">Capacity</th>
+              <th className="text-left px-5 py-3 font-medium hidden md:table-cell uppercase text-[10px]">Created At</th>
+              <th className="text-left px-5 py-3 font-medium uppercase text-[10px]">Status</th>
+              <th className="text-right px-5 py-3 font-medium uppercase text-[10px]">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.map((b, idx) => {
+              const cleanName = b.blob_name.includes('/') ? b.blob_name.split('/').slice(1).join('/') : b.blob_name;
+              const isEncrypted = cleanName.startsWith(ENCRYPTION_PREFIX) || 
+                                  cleanName.startsWith("ENC:v1:") || 
+                                  cleanName.toLowerCase().endsWith(".vault");
+              const displayName = isEncrypted 
+                ? cleanName.replace(ENCRYPTION_PREFIX, "").replace("ENC:v1:", "").replace(/\.vault$/i, "")
+                : cleanName;
+
+              return (
+                <tr key={b.blob_name} className="border-b border-border/20 hover:bg-muted/10 transition-colors group">
+                  <td className="px-5 py-3.5">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center relative border border-primary/5">
+                        <FileText className="h-5 w-5 text-primary shrink-0" />
+                        {isEncrypted && (
+                          <div className="absolute -top-1 -right-1 bg-accent rounded-full p-0.5 border-2 border-background shadow-lg">
+                            <Lock className="h-2 w-2 text-white" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="font-bold text-foreground truncate max-w-[180px]" title={cleanName}>
+                          {displayName}
+                        </span>
+                        {isEncrypted && (
+                          <span className="text-[9px] text-accent font-black uppercase tracking-widest">
+                            Encrypted Vault
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-5 py-3.5 text-muted-foreground hidden sm:table-cell font-mono">
+                    {formatBytes(b.size)}
+                  </td>
+                  <td className="px-5 py-3.5 text-muted-foreground hidden md:table-cell">
+                    {fromShelbyTimestamp(b.created_at).toLocaleDateString()}
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ${isShared ? 'bg-accent/10 text-accent border border-accent/20' : 'bg-primary/10 text-primary border border-primary/20'}`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${isShared ? 'bg-accent' : 'bg-primary'} animate-pulse`} />
+                      {isShared ? 'SHARED' : 'PRIVATE'}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3.5 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button variant="ghost" size="icon" className="h-9 w-9 text-accent hover:bg-accent/10 rounded-xl transition-all" onClick={() => onDownload(b)}>
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      {!isShared && (
+                        <Button variant="ghost" size="icon" className="h-9 w-9 text-destructive hover:bg-destructive/10 rounded-xl transition-all" onClick={() => onDelete?.(idx)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <a href={`https://explorer.aptoslabs.com/account/${b.owner}?network=testnet`} target="_blank" rel="noopener noreferrer">
+                        <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:bg-muted rounded-xl transition-all">
+                          <Compass className="h-4 w-4" />
+                        </Button>
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};

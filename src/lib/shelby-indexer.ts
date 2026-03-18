@@ -60,6 +60,53 @@ export async function fetchAccountBlobs(owner: string, apiKey?: string): Promise
     return [];
   }
 }
+/**
+ * Fetches all blobs where the given address has been granted access.
+ */
+export async function fetchSharedBlobs(sharee: string, apiKey?: string): Promise<ShelbyBlob[]> {
+  const query = `
+    query GetSharedBlobs($sharee: String!) {
+      blobs(where: { permissions: { sharee: { _eq: $sharee } }, is_deleted: { _eq: 0 } }, order_by: { created_at: desc }) {
+        blob_name
+        size
+        created_at
+        expires_at
+        owner
+      }
+    }
+  `;
+
+  try {
+    const normalizedSharee = normalizeAptosAddress(sharee);
+    const response = await fetch(SHELBY_INDEXER_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey || "AG-7FPFEZSPINUP4F7HKVSIO1ZPOEDZ8E5WN"}`
+      },
+      body: JSON.stringify({
+        query,
+        variables: { sharee: normalizedSharee }
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Indexer request failed: ${response.statusText}`);
+    }
+
+    const { data, errors } = await response.json();
+    
+    if (errors) {
+      console.error("[ShelbyIndexer] GraphQL Errors:", errors);
+      return [];
+    }
+
+    return data?.blobs || [];
+  } catch (error) {
+    console.error("[ShelbyIndexer] Fetch shared error:", error);
+    return [];
+  }
+}
 
 /**
  * Normalizes an Aptos address to a full 64-character hex string (excluding 0x).
