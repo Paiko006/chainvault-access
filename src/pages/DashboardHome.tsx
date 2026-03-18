@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FileText, HardDrive, Share2, Clock, ExternalLink, Upload, PlugZap, Loader2, RefreshCw, Key, ShieldCheck, Copy, Eye, EyeOff, ShieldAlert } from "lucide-react";
+import { FileText, HardDrive, Share2, Clock, ExternalLink, Upload, PlugZap, Loader2, RefreshCw, Key, ShieldCheck, Copy, Eye, EyeOff, ShieldAlert, Unlock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
@@ -7,9 +7,10 @@ import { useAptBalance } from "@aptos-labs/react";
 import { Link } from "react-router-dom";
 import { shortenAddress } from "@/lib/wallet";
 import { fetchAccountBlobs, ShelbyBlob, formatBytes, fromShelbyTimestamp } from "@/lib/shelby-indexer";
+import { getVaultKey } from "@/lib/crypto";
 
 export default function DashboardHome() {
-  const { connected, account } = useWallet();
+  const { connected, account, signMessage } = useWallet();
   const { data: aptBalance, isLoading: balanceLoading } = useAptBalance();
   const [blobs, setBlobs] = useState<ShelbyBlob[]>([]);
   const [loading, setLoading] = useState(false);
@@ -23,6 +24,22 @@ export default function DashboardHome() {
       setVaultSeed(seed);
     }
   }, [account]);
+
+  const handleUnlock = async () => {
+    if (!account || !signMessage) {
+      toast.error("Wallet not connected");
+      return;
+    }
+    try {
+      toast.loading("Requesting signature...", { id: "unlock" });
+      await getVaultKey(account.address.toString(), signMessage);
+      const seed = localStorage.getItem(`vault_seed_${account.address.toString()}`);
+      setVaultSeed(seed);
+      toast.success("Vault Unlocked! 🔓", { id: "unlock" });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to unlock vault", { id: "unlock" });
+    }
+  };
 
   useEffect(() => {
     async function loadData() {
@@ -187,33 +204,42 @@ export default function DashboardHome() {
 
           <div className="flex flex-col gap-3 min-w-[300px]">
              <div className="relative group/key">
-              <div className={`p-4 pr-24 rounded-xl bg-secondary/50 border border-border/50 font-mono text-[11px] break-all transition-all duration-500 ${!showKey ? 'blur-md select-none opacity-50' : 'bg-secondary/80 shadow-inner'}`}>
-                {vaultSeed || "Seed not found. Upload a file first."}
+              <div className={`p-4 pr-24 rounded-xl border font-mono text-[11px] break-all transition-all duration-500 ${!vaultSeed ? 'bg-secondary/20 border-dashed border-accent/40 opacity-80' : !showKey ? 'bg-secondary/50 border-border/50 blur-md select-none opacity-50' : 'bg-secondary/80 border-border/50 shadow-inner'}`}>
+                {vaultSeed || "Vault is Locked on this device"}
               </div>
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-9 w-9 text-muted-foreground hover:text-accent hover:bg-accent/10 rounded-lg transition-all active:scale-90"
-                  onClick={() => setShowKey(!showKey)}
-                  title={showKey ? "Hide Secret" : "Reveal Secret"}
-                >
-                  {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-9 w-9 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all active:scale-90"
-                  onClick={() => {
-                    if (vaultSeed) {
-                      navigator.clipboard.writeText(vaultSeed);
-                      toast.success("Vault Key copied to clipboard! 📋");
-                    }
-                  }}
-                  title="Copy to Clipboard"
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
+                {!vaultSeed ? (
+                   <Button size="sm" onClick={handleUnlock} className="h-8 text-xs font-bold gap-1 bg-accent hover:bg-accent/90 text-white shadow-sm">
+                      <Unlock className="h-3 w-3" />
+                      Unlock Vault
+                   </Button>
+                ) : (
+                  <>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-9 w-9 text-muted-foreground hover:text-accent hover:bg-accent/10 rounded-lg transition-all active:scale-90"
+                      onClick={() => setShowKey(!showKey)}
+                      title={showKey ? "Hide Secret" : "Reveal Secret"}
+                    >
+                      {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-9 w-9 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all active:scale-90"
+                      onClick={() => {
+                        if (vaultSeed) {
+                          navigator.clipboard.writeText(vaultSeed);
+                          toast.success("Vault Key copied to clipboard! 📋");
+                        }
+                      }}
+                      title="Copy to Clipboard"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2 text-[10px] text-accent/80 font-bold uppercase tracking-widest">

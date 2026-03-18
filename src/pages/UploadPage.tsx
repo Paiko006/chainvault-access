@@ -33,7 +33,7 @@ export default function UploadPage() {
   const [dragOver, setDragOver] = useState(false);
   const [wallets, setWallets] = useState<string[]>([""]);
   const [isEncrypting, setIsEncrypting] = useState(false);
-  const { account, signAndSubmitTransaction, connected } = useWallet();
+  const { account, signAndSubmitTransaction, connected, signMessage } = useWallet();
   const { addNotification } = useNotifications();
 
   const expirationMicros = (Date.now() + 1 * 365 * 24 * 60 * 60 * 1000) * 1000; // 1 year from now
@@ -96,7 +96,7 @@ export default function UploadPage() {
         type: "info"
       });
 
-      const vaultKey = await getVaultKey(account.address.toString());
+      const vaultKey = await getVaultKey(account.address.toString(), signMessage);
       const provider = await createDefaultErasureCodingProvider();
       const preparedBlobs: { safeName: string; data: Uint8Array; commitments: any; numChunksets: number; originalSize: number }[] = [];
 

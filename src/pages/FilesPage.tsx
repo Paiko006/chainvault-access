@@ -51,7 +51,7 @@ import {
 } from "@/components/ui/dialog";
 
 export default function FilesPage() {
-  const { connected, account, signAndSubmitTransaction } = useWallet();
+  const { connected, account, signAndSubmitTransaction, signMessage } = useWallet();
   const { addNotification } = useNotifications();
   const [search, setSearch] = useState("");
   const [blobs, setBlobs] = useState<ShelbyBlob[]>([]);
@@ -60,33 +60,36 @@ export default function FilesPage() {
   const [refresh, setRefresh] = useState(0);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  // Decryption Modal State for Shared Files
+  // Decryption Modal State
   const [isDecryptModalOpen, setIsDecryptModalOpen] = useState(false);
   const [activeSharedBlob, setActiveSharedBlob] = useState<ShelbyBlob | null>(null);
   const [manualKey, setManualKey] = useState("");
 
+  const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY;
+
   useEffect(() => {
-    async function loadData() {
-      if (connected && account) {
-        setLoading(true);
-        try {
-          const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || "";
-          const [myFiles, sharedFiles] = await Promise.all([
-            fetchAccountBlobs(account.address.toString(), apiKey),
-            fetchSharedBlobs(account.address.toString(), apiKey)
-          ]);
-          setBlobs(myFiles);
-          setSharedBlobs(sharedFiles);
-        } catch (err) {
-          console.error("Failed to fetch files:", err);
-          toast.error("Failed to sync with Shelby network");
-        } finally {
-          setLoading(false);
-        }
+    if (!connected || !account || !apiKey) return;
+    
+    const loadFiles = async () => {
+      setLoading(true);
+      try {
+        const addr = account.address.toString();
+        // Fetch User's Blobs
+        const userBlobs = await fetchAccountBlobs(addr);
+        setBlobs(userBlobs);
+
+        // Fetch Shared Blobs (Mocking cross-check with indexer structure)
+        const shared = await fetchSharedBlobs(addr);
+        setSharedBlobs(shared);
+      } catch (err) {
+        console.error("[ChainVault] Error fetching files:", err);
+      } finally {
+        setLoading(false);
       }
-    }
-    loadData();
-  }, [connected, account, refresh]);
+    };
+
+    loadFiles();
+  }, [connected, account, refresh, apiKey]);
 
   const filtered = blobs.filter((b) =>
     b.blob_name.toLowerCase().includes(search.toLowerCase())
@@ -114,7 +117,7 @@ export default function FilesPage() {
 
       // 2. Decrypt if needed
       if (isEncrypted) {
-        const key = await getVaultKey(account.address.toString());
+        const key = await getVaultKey(account.address.toString(), signMessage);
         finalBlob = await decryptData(rawBlob, key);
         toast.success("File decrypted successfully! 🔓", { id: "dl-toast" });
       } else {
@@ -128,6 +131,7 @@ export default function FilesPage() {
       // Clean filename for user: remove both prefix and .vault extension
       const fileNameForUser = cleanName
         .replace(ENCRYPTION_PREFIX, "")
+        .replace("ENC-v1-", "")
         .replace("ENC:v1:", "")
         .replace(/\.vault$/i, "");
       a.download = fileNameForUser;

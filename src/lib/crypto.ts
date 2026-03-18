@@ -11,14 +11,37 @@ const KEY_USAGE: KeyUsage[] = ["encrypt", "decrypt"];
  * Gets or creates a unique encryption key for the given wallet address.
  * Stores a random seed in localStorage to ensure persistence across sessions.
  */
-export async function getVaultKey(address: string): Promise<CryptoKey> {
-  const storageKey = `vault_seed_${address}`;
-  let seedBase64 = localStorage.getItem(storageKey);
+export async function getVaultKey(addressOrSeed: string, signMessage?: (payload: any) => Promise<any>): Promise<CryptoKey> {
+  let seedBase64: string | null = null;
+  const isDirectSeed = addressOrSeed.length > 40 && !addressOrSeed.startsWith("0x");
 
-  if (!seedBase64) {
-    const randomSeed = window.crypto.getRandomValues(new Uint8Array(32));
-    seedBase64 = btoa(String.fromCharCode(...randomSeed));
-    localStorage.setItem(storageKey, seedBase64);
+  if (isDirectSeed) {
+    seedBase64 = addressOrSeed;
+  } else {
+    const storageKey = `vault_seed_${addressOrSeed}`;
+    seedBase64 = localStorage.getItem(storageKey);
+
+    if (!seedBase64) {
+      if (signMessage) {
+        try {
+          const response = await signMessage({
+            message: "Welcome to ShelbySecure!\n\nSign this message to securely unlock your decentralized data vault and generate your encryption key.\n\nThis request will not trigger a blockchain transaction or cost any gas fees.",
+            nonce: "1",
+          });
+          
+          // Hash the signature to derive 32 bytes of entropy for the seed
+          const sigData = new TextEncoder().encode(response.signature || response.fullMessage || "fallback-sig-entropy");
+          const hashBuffer = await window.crypto.subtle.digest("SHA-256", sigData);
+          
+          seedBase64 = btoa(String.fromCharCode(...new Uint8Array(hashBuffer)));
+          localStorage.setItem(storageKey, seedBase64);
+        } catch (err: any) {
+          throw new Error("Vault signature required. Please approve the signing request to unlock.");
+        }
+      } else {
+        throw new Error("Vault is locked on this device. Signature function required to generate the key.");
+      }
+    }
   }
 
   const seed = new Uint8Array(
@@ -40,7 +63,7 @@ export async function getVaultKey(address: string): Promise<CryptoKey> {
   return await window.crypto.subtle.deriveKey(
     {
       name: "PBKDF2",
-      salt: new TextEncoder().encode(address), // Use address as salt
+      salt: new TextEncoder().encode(isDirectSeed ? "shared_vault" : addressOrSeed), // Use generic salt for direct seeds
       iterations: 100000,
       hash: "SHA-256",
     },
@@ -50,6 +73,7 @@ export async function getVaultKey(address: string): Promise<CryptoKey> {
     KEY_USAGE
   );
 }
+
 
 /**
  * Encrypts a file buffer. Returns a new Blob containing [IV][Ciphertext].
