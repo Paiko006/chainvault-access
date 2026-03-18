@@ -15,6 +15,7 @@ import {
   Users,
   Key,
   Shield,
+  ShieldCheck,
   Clock,
   Database,
   Eye
@@ -477,19 +478,35 @@ const FileTable = ({
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center relative border border-primary/5">
                         <FileText className="h-5 w-5 text-primary shrink-0" />
-                        {isEncrypted && (
+                        {isEncrypted ? (
                           <div className="absolute -top-1 -right-1 bg-accent rounded-full p-0.5 border-2 border-background shadow-lg">
                             <Lock className="h-2 w-2 text-white" />
+                          </div>
+                        ) : (
+                          <div className="absolute -top-1 -right-1 bg-muted-foreground/30 rounded-full p-0.5 border-2 border-background shadow-lg">
+                            <ExternalLink className="h-2 w-2 text-white" />
                           </div>
                         )}
                       </div>
                       <div className="flex flex-col">
-                        <span className="font-bold text-foreground truncate max-w-[180px]" title={cleanName}>
-                          {displayName}
-                        </span>
-                        {isEncrypted && (
-                          <span className="text-[9px] text-accent font-black uppercase tracking-widest">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-foreground truncate max-w-[180px]" title={cleanName}>
+                            {displayName}
+                          </span>
+                          {isEncrypted && (
+                            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-primary/20 text-primary border border-primary/30 text-[8px] font-black uppercase tracking-tighter">
+                              <ShieldCheck className="h-2 w-2" />
+                              VERIFIED
+                            </div>
+                          )}
+                        </div>
+                        {isEncrypted ? (
+                          <span className="text-[9px] text-accent font-black uppercase tracking-widest leading-none mt-0.5">
                             Encrypted Vault
+                          </span>
+                        ) : (
+                          <span className="text-[9px] text-muted-foreground font-medium uppercase tracking-widest leading-none mt-0.5">
+                            External Asset
                           </span>
                         )}
                       </div>
