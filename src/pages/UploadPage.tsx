@@ -122,7 +122,11 @@ export default function UploadPage() {
         ],
         expirationMicros,
       }, {
-        onSuccess: () => {
+        onSuccess: async () => {
+          // Give indexer a moment to process before showing success
+          toast.info("Syncing with network...");
+          await new Promise(r => setTimeout(r, 2000));
+          
           setIsEncrypting(false);
           const sharedWith = wallets.filter(w => w.trim() !== "");
           

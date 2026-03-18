@@ -64,9 +64,14 @@ export async function fetchAccountBlobs(owner: string, apiKey?: string): Promise
  * Fetches raw blob data from the Shelby network for decryption.
  */
 export async function fetchBlobData(blobName: string): Promise<Blob> {
+  const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || "AG-7FPFEZSPINUP4F7HKVSIO1ZPOEDZ8E5WN";
   const url = `https://api.testnet.aptoslabs.com/nocode/v1/public/alias/shelby/testnet/v1/blob/${blobName}`;
-  const response = await fetch(url);
-  if (!response.ok) throw new Error("Failed to fetch blob data");
+  const response = await fetch(url, {
+    headers: {
+      "Authorization": `Bearer ${apiKey}`
+    }
+  });
+  if (!response.ok) throw new Error(`Failed to fetch blob data: ${response.statusText}`);
   return await response.blob();
 }
 
