@@ -52,8 +52,13 @@ export function CanvasText({
       setBgColor(computed.backgroundColor);
     }
     const resolved = colors.map(resolveColor);
-    setResolvedColors(resolved);
-  }, [colors]);
+    
+    // Only update state if the resolved colors actually changed
+    setResolvedColors((prev) => {
+      if (JSON.stringify(prev) === JSON.stringify(resolved)) return prev;
+      return resolved;
+    });
+  }, [colors]); // We still keep colors here, but the setter check prevents the loop
 
   useEffect(() => {
     updateColors();
