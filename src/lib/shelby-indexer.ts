@@ -79,9 +79,26 @@ function normalizeAptosAddress(addr: string): string {
  */
 export async function fetchBlobData(blobName: string, owner: string): Promise<Blob> {
   const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || "AG-7FPFEZSPINUP4F7HKVSIO1ZPOEDZ8E5WN";
-  // Official Shelby Gateway URL with normalized owner address
+  
+  // The indexer returns blob_name as "@address/suffix". 
+  // We need to extract only the suffix for the Gateway URL.
+  let cleanBlobName = blobName;
+  if (cleanBlobName.includes('/')) {
+    cleanBlobName = cleanBlobName.split('/').slice(1).join('/');
+  } else if (cleanBlobName.startsWith('@')) {
+    // Fallback if formatting is weird but still has @
+    const firstSlash = cleanBlobName.indexOf('/');
+    if (firstSlash !== -1) {
+       cleanBlobName = cleanBlobName.substring(firstSlash + 1);
+    }
+  }
+
   const normalizedOwner = normalizeAptosAddress(owner);
-  const url = `https://api.testnet.shelby.xyz/shelby/v1/blobs/${normalizedOwner}/${encodeURIComponent(blobName)}`;
+  // Gateway expects: .../blobs/{owner}/{blobNameSuffix}
+  // Important: Do NOT encode the whole suffix if it contains slashes (directory structure)
+  // Our files don't have slashes, but for generic safety we encode parts.
+  const encodedName = cleanBlobName.split('/').map(p => encodeURIComponent(p)).join('/');
+  const url = `https://api.testnet.shelby.xyz/shelby/v1/blobs/${normalizedOwner}/${encodedName}`;
 
   const maxAttempts = 3;
   const delayMs = 2000;

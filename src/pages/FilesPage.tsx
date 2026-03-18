@@ -238,10 +238,11 @@ export default function FilesPage() {
               </thead>
               <tbody>
                 {filtered.map((b, idx) => {
-                  const isEncrypted = b.blob_name.startsWith(ENCRYPTION_PREFIX) || b.blob_name.startsWith("ENC:v1:");
+                  const cleanName = b.blob_name.includes('/') ? b.blob_name.split('/').slice(1).join('/') : b.blob_name;
+                  const isEncrypted = cleanName.startsWith(ENCRYPTION_PREFIX) || cleanName.startsWith("ENC:v1:");
                   const displayName = isEncrypted 
-                    ? b.blob_name.replace(ENCRYPTION_PREFIX, "").replace("ENC:v1:", "") 
-                    : b.blob_name;
+                    ? cleanName.replace(ENCRYPTION_PREFIX, "").replace("ENC:v1:", "") 
+                    : cleanName;
                   const isDownloading = downloadingId === b.blob_name;
 
                   return (
@@ -260,8 +261,8 @@ export default function FilesPage() {
                             )}
                           </div>
                           <div className="flex flex-col">
-                            <span className="font-medium text-foreground truncate max-w-[200px]" title={b.blob_name}>
-                              {b.blob_name.replace(ENCRYPTION_PREFIX, "").split('/').pop()}
+                            <span className="font-medium text-foreground truncate max-w-[200px]" title={cleanName}>
+                              {displayName}
                             </span>
                             {isEncrypted && (
                               <span className="text-[9px] text-accent font-bold uppercase tracking-tighter">
@@ -300,7 +301,7 @@ export default function FilesPage() {
                             )}
                           </Button>
                           <a
-                            href={`https://explorer.shelby.xyz/testnet/blobs/${b.owner}?blobName=${encodeURIComponent(b.blob_name)}`}
+                            href={`https://explorer.shelby.xyz/testnet/blobs/${b.owner}?blobName=${encodeURIComponent(cleanName)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                           >
