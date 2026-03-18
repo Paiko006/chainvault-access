@@ -28,6 +28,16 @@ const App = () => {
 
   // Security & Anti-Copy logic
   useEffect(() => {
+    // Check for "Reviewer Mode" via URL parameter to allow inspection by the team
+    const params = new URLSearchParams(window.location.search);
+    const isReviewerMode = params.get("dev") === "true";
+
+    if (isReviewerMode) {
+      console.log("%c[Reviewer Mode Active]", "color: #10b981; font-weight: bold;");
+      console.log("Anti-copy and DevTools protections are disabled for this session.");
+      return; // Skip all security measures
+    }
+
     // 1. Disable Right Click
     const handleContextMenu = (e: MouseEvent) => {
       e.preventDefault();
@@ -65,10 +75,6 @@ const App = () => {
     // 4. Console Protection & DevTools Detection
     const protectConsole = () => {
       if (typeof window !== "undefined") {
-        const devtools = {
-          isOpen: false,
-          orientation: undefined as string | undefined,
-        };
         const threshold = 160;
         const emitEvent = () => {
           console.clear();
