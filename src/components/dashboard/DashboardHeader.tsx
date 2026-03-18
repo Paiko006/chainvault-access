@@ -1,4 +1,4 @@
-import { Bell, ChevronDown, CheckCircle2, ShieldInfo, Zap } from "lucide-react";
+import { Bell, ChevronDown, CheckCircle2, Shield, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { WalletButton } from "@/components/wallet/WalletButton";
 import {
@@ -30,7 +30,7 @@ export function DashboardHeader() {
       id: 3,
       title: "Welcome to ChainVault",
       time: "5 hours ago",
-      icon: <ShieldInfo className="h-3 w-3 text-muted-foreground" />,
+      icon: <Shield className="h-3 w-3 text-muted-foreground" />,
       color: "bg-muted"
     }
   ];
