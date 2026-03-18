@@ -84,7 +84,7 @@ export default function SettingsPage() {
             </div>
             {connected && (
               <a 
-                href={`https://explorer.aptoslabs.com/account/${account?.address}?network=testnet`} 
+                href={`https://explorer.shelby.xyz/testnet/account/${account?.address}`} 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="p-2 hover:bg-muted rounded-full transition-colors"

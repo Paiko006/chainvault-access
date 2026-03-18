@@ -329,7 +329,7 @@ export default function AccessControlPage() {
                   )}
                 </div>
                 <Button variant="link" className="text-xs p-0 h-auto text-muted-foreground hover:text-primary gap-1 group/btn" asChild>
-                  <a href={`https://explorer.aptoslabs.com/account/${b.ownerAddress}?network=testnet`} target="_blank" rel="noopener noreferrer">
+                  <a href={`https://explorer.shelby.xyz/testnet/account/${b.ownerAddress}`} target="_blank" rel="noopener noreferrer">
                     Explorer <ExternalLink className="h-3 w-3 transition-transform group-hover/btn:-translate-y-0.5 group-hover/btn:translate-x-0.5" />
                   </a>
                 </Button>
