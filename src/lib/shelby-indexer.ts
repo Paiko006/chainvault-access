@@ -30,6 +30,7 @@ export async function fetchAccountBlobs(owner: string, apiKey?: string): Promise
   `;
 
   try {
+    const normalizedOwner = normalizeAptosAddress(owner);
     const response = await fetch(SHELBY_INDEXER_URL, {
       method: "POST",
       headers: {
@@ -38,7 +39,7 @@ export async function fetchAccountBlobs(owner: string, apiKey?: string): Promise
       },
       body: JSON.stringify({
         query,
-        variables: { owner }
+        variables: { owner: normalizedOwner }
       })
     });
 
@@ -61,12 +62,26 @@ export async function fetchAccountBlobs(owner: string, apiKey?: string): Promise
 }
 
 /**
+ * Normalizes an Aptos address to a full 64-character hex string (excluding 0x).
+ * This is often required by Shelby Gateway for strict path matching.
+ */
+function normalizeAptosAddress(addr: string): string {
+  let clean = addr.toLowerCase();
+  if (clean.startsWith("0x")) {
+    clean = clean.slice(2);
+  }
+  // Pad to 64 characters with leading zeros
+  return "0x" + clean.padStart(64, "0");
+}
+
+/**
  * Fetches raw blob data from the Shelby network for decryption.
  */
 export async function fetchBlobData(blobName: string, owner: string): Promise<Blob> {
   const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || "AG-7FPFEZSPINUP4F7HKVSIO1ZPOEDZ8E5WN";
-  // Official Shelby Gateway URL: https://api.testnet.shelby.xyz/shelby/v1/blobs/{owner}/{blobName}
-  const url = `https://api.testnet.shelby.xyz/shelby/v1/blobs/${owner}/${encodeURIComponent(blobName)}`;
+  // Official Shelby Gateway URL with normalized owner address
+  const normalizedOwner = normalizeAptosAddress(owner);
+  const url = `https://api.testnet.shelby.xyz/shelby/v1/blobs/${normalizedOwner}/${encodeURIComponent(blobName)}`;
 
   const maxAttempts = 3;
   const delayMs = 2000;
