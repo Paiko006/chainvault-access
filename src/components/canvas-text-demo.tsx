@@ -1,23 +1,20 @@
 "use client";
-import React from "react";
 import { cn } from "@/lib/utils";
 import { CanvasText } from "@/components/ui/canvas-text";
 
 export default function CanvasTextDemo() {
-  const brandColors = React.useMemo(() => [
-    "#3b82f6", // Blue 500
-    "#0ea5e9", // Sky 500
-    "#8b5cf6", // Violet 500
-    "#14b8a6", // Teal 500
-  ], []);
-
   return (
-    <div className="flex min-h-80 items-center justify-center bg-transparent p-8">
+    <div className="flex min-h-80 items-center justify-center bg-white p-8 dark:bg-neutral-950">
       <CanvasText
-        text="ShelbySecure"
-        className="text-4xl font-bold md:text-6xl lg:text-8xl"
+        text="Aceternity"
+        className="text-2xl font-bold md:text-4xl lg:text-6xl"
         backgroundClassName="bg-black dark:bg-neutral-700"
-        colors={brandColors}
+        colors={[
+          "var(--color-blue-500)",
+          "var(--color-sky-500)",
+          "var(--color-violet-500)",
+          "var(--color-teal-500)",
+        ]}
         lineGap={6}
         animationDuration={10}
       />

@@ -5,7 +5,6 @@ import { useNavigate } from "react-router-dom";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { useState, useEffect } from "react";
 import { ConnectWalletModal } from "@/components/wallet/ConnectWalletModal";
-import CanvasTextDemo from "@/components/canvas-text-demo";
 
 export function HeroSection() {
   const { connected } = useWallet();
@@ -31,13 +30,9 @@ export function HeroSection() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: "easeOut" }}
         >
-          <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-card/60 px-4 py-1.5 text-sm text-muted-foreground mb-4">
+          <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-card/60 px-4 py-1.5 text-sm text-muted-foreground mb-8">
             <Lock className="h-3.5 w-3.5 text-accent" />
             <span>Decentralized File Security</span>
-          </div>
-
-          <div className="mb-2">
-            <CanvasTextDemo />
           </div>
 
           <h1 className="text-5xl md:text-7xl font-bold leading-tight tracking-tight mb-6">
@@ -54,19 +49,19 @@ export function HeroSection() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Button 
-               variant="hero" 
-               size="lg" 
-               className="text-base px-8 py-6 rounded-xl"
-               onClick={() => handleAction('/dashboard')}
+            <Button
+              variant="hero"
+              size="lg"
+              className="text-base px-8 py-6 rounded-xl"
+              onClick={() => handleAction('/dashboard')}
             >
               Launch App
             </Button>
-            <Button 
-               variant="heroOutline" 
-               size="lg" 
-               className="text-base px-8 py-6 rounded-xl"
-               onClick={() => handleAction('/dashboard/upload')}
+            <Button
+              variant="heroOutline"
+              size="lg"
+              className="text-base px-8 py-6 rounded-xl"
+              onClick={() => handleAction('/dashboard/upload')}
             >
               <Upload className="mr-2 h-4 w-4" />
               Upload File
@@ -74,7 +69,7 @@ export function HeroSection() {
           </div>
         </motion.div>
       </div>
-      
+
       <ConnectWalletModal open={modalOpen} onClose={() => setModalOpen(false)} />
     </section>
   );
