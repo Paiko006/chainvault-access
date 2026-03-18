@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { FileText, HardDrive, Share2, Clock, ExternalLink, Upload, PlugZap, Loader2, RefreshCw } from "lucide-react";
+import { FileText, HardDrive, Share2, Clock, ExternalLink, Upload, PlugZap, Loader2, RefreshCw, Key, ShieldCheck, Copy, Eye, EyeOff, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { useAptBalance } from "@aptos-labs/react";
 import { Link } from "react-router-dom";
@@ -13,6 +14,15 @@ export default function DashboardHome() {
   const [blobs, setBlobs] = useState<ShelbyBlob[]>([]);
   const [loading, setLoading] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
+  const [showKey, setShowKey] = useState(false);
+  const [vaultSeed, setVaultSeed] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (account) {
+      const seed = localStorage.getItem(`vault_seed_${account.address}`);
+      setVaultSeed(seed);
+    }
+  }, [account]);
 
   useEffect(() => {
     async function loadData() {
@@ -151,6 +161,67 @@ export default function DashboardHome() {
             <div className="text-xs text-muted-foreground uppercase tracking-widest font-bold">{s.label}</div>
           </div>
         ))}
+      </div>
+
+      {/* Security & Vault Key */}
+      <div className="glass-card p-6 rounded-2xl border-l-4 border-l-accent relative overflow-hidden group">
+        <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
+          <ShieldCheck className="h-24 w-24 text-accent" />
+        </div>
+        
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Key className="h-5 w-5 text-accent" />
+                Security & Vault Key
+              </h2>
+              <span className="bg-accent/10 text-accent text-[9px] font-black px-2 py-0.5 rounded-full border border-accent/20 uppercase tracking-tighter">
+                Highly Confidential
+              </span>
+            </div>
+            <p className="text-muted-foreground text-xs max-w-lg leading-relaxed">
+              This is your unique **Decryption Seed**. Share this key **ONLY** with people you want to grant full reading access to your encrypted vault files.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3 min-w-[300px]">
+             <div className="relative group/key">
+              <div className={`p-4 pr-24 rounded-xl bg-secondary/50 border border-border/50 font-mono text-[11px] break-all transition-all duration-500 ${!showKey ? 'blur-md select-none opacity-50' : 'bg-secondary/80 shadow-inner'}`}>
+                {vaultSeed || "Seed not found. Upload a file first."}
+              </div>
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-9 w-9 text-muted-foreground hover:text-accent hover:bg-accent/10 rounded-lg transition-all active:scale-90"
+                  onClick={() => setShowKey(!showKey)}
+                  title={showKey ? "Hide Secret" : "Reveal Secret"}
+                >
+                  {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-9 w-9 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all active:scale-90"
+                  onClick={() => {
+                    if (vaultSeed) {
+                      navigator.clipboard.writeText(vaultSeed);
+                      toast.success("Vault Key copied to clipboard! 📋");
+                    }
+                  }}
+                  title="Copy to Clipboard"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-[10px] text-accent/80 font-bold uppercase tracking-widest">
+              <ShieldAlert className="h-3.5 w-3.5 animate-pulse" />
+              Stored locally on your device only.
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Recent files table */}
