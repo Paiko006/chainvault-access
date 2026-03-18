@@ -10,30 +10,43 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+import { Bell, ChevronDown, CheckCircle2, Shield, Zap, Info, AlertCircle, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { WalletButton } from "@/components/wallet/WalletButton";
+import { useNotifications, NotificationType } from "@/hooks/use-notifications";
+import { formatDistanceToNow } from "date-fns";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 export function DashboardHeader() {
-  const mockNotifications = [
-    {
-      id: 1,
-      title: "Batch Upload Successful",
-      time: "2 mins ago",
-      icon: <Zap className="h-3 w-3 text-accent" />,
-      color: "bg-accent/10"
-    },
-    {
-      id: 2,
-      title: "New Vault Secured",
-      time: "1 hour ago",
-      icon: <CheckCircle2 className="h-3 w-3 text-primary" />,
-      color: "bg-primary/10"
-    },
-    {
-      id: 3,
-      title: "Welcome to ChainVault",
-      time: "5 hours ago",
-      icon: <Shield className="h-3 w-3 text-muted-foreground" />,
-      color: "bg-muted"
+  const { notifications, markAllAsRead, clearAll, markAsRead } = useNotifications();
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const getIcon = (type: NotificationType) => {
+    switch (type) {
+      case "success": return <CheckCircle2 className="h-3 w-3 text-primary" />;
+      case "info": return <Info className="h-3 w-3 text-blue-400" />;
+      case "warning": return <AlertCircle className="h-3 w-3 text-yellow-400" />;
+      case "error": return <AlertCircle className="h-3 w-3 text-destructive" />;
+      default: return <Zap className="h-3 w-3 text-accent" />;
     }
-  ];
+  };
+
+  const getColor = (type: NotificationType) => {
+    switch (type) {
+      case "success": return "bg-primary/10";
+      case "info": return "bg-blue-400/10";
+      case "warning": return "bg-yellow-400/10";
+      case "error": return "bg-destructive/10";
+      default: return "bg-accent/10";
+    }
+  };
 
   return (
     <header className="h-16 border-b border-border flex items-center justify-between px-6 bg-card/50 backdrop-blur-sm sticky top-0 z-30">
@@ -42,40 +55,95 @@ export function DashboardHeader() {
       <div className="flex items-center gap-4">
         <WalletButton />
 
-        <DropdownMenu>
+        <DropdownMenu onOpenChange={(open) => {
+          if (!open && unreadCount > 0) {
+            // Optional: Auto-mark as read when closing? 
+            // Better to have a manual "Mark all as read"
+          }
+        }}>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative hover:bg-muted/50 transition-colors">
               <Bell className="h-4 w-4" />
-              <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-accent animate-pulse" />
+              {unreadCount > 0 && (
+                <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-accent animate-pulse" />
+              )}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-80 glass-card p-2 border-border/50 animate-in fade-in zoom-in-95 duration-200">
             <DropdownMenuLabel className="px-3 py-2">
               <div className="flex items-center justify-between">
                 <span className="font-bold">Notifications</span>
-                <span className="text-[10px] bg-primary/20 text-primary px-1.5 rounded uppercase tracking-tighter">3 New</span>
+                {unreadCount > 0 && (
+                  <span className="text-[10px] bg-primary/20 text-primary px-1.5 rounded uppercase tracking-tighter">
+                    {unreadCount} New
+                  </span>
+                )}
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator className="bg-border/30" />
             
-            <div className="max-h-[300px] overflow-y-auto space-y-1 mt-1">
-              {mockNotifications.map((n) => (
-                <DropdownMenuItem key={n.id} className="flex gap-3 items-start p-3 rounded-xl cursor-pointer hover:bg-muted/50 focus:bg-muted/50 transition-all group">
-                  <div className={`mt-0.5 h-8 w-8 rounded-lg ${n.color} flex items-center justify-center shrink-0`}>
-                    {n.icon}
-                  </div>
-                  <div className="flex flex-col gap-0.5 overflow-hidden">
-                    <span className="text-sm font-medium leading-none group-hover:text-primary transition-colors">{n.title}</span>
-                    <span className="text-[10px] text-muted-foreground">{n.time}</span>
-                  </div>
-                </DropdownMenuItem>
-              ))}
+            <div className="max-h-[350px] overflow-y-auto space-y-1 mt-1 custom-scrollbar">
+              {notifications.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground text-xs">
+                  No notifications yet.
+                </div>
+              ) : (
+                notifications.map((n) => (
+                  <DropdownMenuItem 
+                    key={n.id} 
+                    className={`flex gap-3 items-start p-3 rounded-xl cursor-pointer hover:bg-muted/50 focus:bg-muted/50 transition-all group relative ${!n.read ? 'bg-primary/5' : ''}`}
+                    onClick={() => markAsRead(n.id)}
+                  >
+                    {!n.read && (
+                      <div className="absolute top-3 right-3 h-1.5 w-1.5 rounded-full bg-primary" />
+                    )}
+                    <div className={`mt-0.5 h-8 w-8 rounded-lg ${getColor(n.type)} flex items-center justify-center shrink-0`}>
+                      {getIcon(n.type)}
+                    </div>
+                    <div className="flex flex-col gap-0.5 overflow-hidden">
+                      <span className={`text-sm leading-none transition-colors ${!n.read ? 'font-bold text-foreground' : 'font-medium text-muted-foreground'}`}>
+                        {n.title}
+                      </span>
+                      {n.description && (
+                        <span className="text-[10px] text-muted-foreground line-clamp-2 mt-0.5">
+                          {n.description}
+                        </span>
+                      )}
+                      <span className="text-[9px] text-muted-foreground/60 mt-1">
+                        {formatDistanceToNow(n.time, { addSuffix: true })}
+                      </span>
+                    </div>
+                  </DropdownMenuItem>
+                ))
+              )}
             </div>
             
             <DropdownMenuSeparator className="bg-border/30 mt-1" />
-            <DropdownMenuItem className="justify-center text-xs text-muted-foreground hover:text-primary font-medium py-2 rounded-lg">
-              View all notification logs
-            </DropdownMenuItem>
+            <div className="flex items-center justify-between p-1">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-[10px] text-muted-foreground hover:text-primary h-7 px-2"
+                onClick={(e) => {
+                  e.preventDefault();
+                  markAllAsRead();
+                }}
+              >
+                Mark all as read
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-[10px] text-muted-foreground hover:text-destructive h-7 px-2"
+                onClick={(e) => {
+                  e.preventDefault();
+                  clearAll();
+                }}
+              >
+                <Trash2 className="h-3 w-3 mr-1" />
+                Clear
+              </Button>
+            </div>
           </DropdownMenuContent>
         </DropdownMenu>
 

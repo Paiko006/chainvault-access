@@ -14,6 +14,7 @@ import { AccountAddress } from "@aptos-labs/ts-sdk";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { toast } from "sonner";
 import { BLOBS_STORAGE_KEY, StoredBlob, getStoredBlobs, saveStoredBlobs } from "@/types/storage";
+import { useNotifications } from "@/hooks/use-notifications";
 
 function saveToLocalStorage(blob: StoredBlob) {
   try {
@@ -33,6 +34,7 @@ export default function UploadPage() {
   const [wallets, setWallets] = useState<string[]>([""]);
   const [isEncrypting, setIsEncrypting] = useState(false);
   const { account, signAndSubmitTransaction, connected } = useWallet();
+  const { addNotification } = useNotifications();
 
   const expirationMicros = (Date.now() + 1 * 365 * 24 * 60 * 60 * 1000) * 1000; // 1 year from now
 
@@ -88,6 +90,12 @@ export default function UploadPage() {
       setIsEncrypting(true);
       setUploadProgress("Preparing & Encrypting files...");
       
+      addNotification({
+        title: "Batch Upload Started",
+        description: `Securing ${files.length} file(s) into your vault.`,
+        type: "info"
+      });
+
       const vaultKey = await getVaultKey(account.address.toString());
       const provider = await createDefaultErasureCodingProvider();
       const preparedBlobs: { safeName: string; data: Uint8Array; commitments: any; numChunksets: number; originalSize: number }[] = [];
@@ -178,9 +186,20 @@ export default function UploadPage() {
           expirationMicros,
           sharedWith,
         });
+
+        addNotification({
+          title: "File Secured",
+          description: `Successfully uploaded ${b.safeName} to Shelby.`,
+          type: "success"
+        });
       }
 
       toast.success(`Successfully secured ${files.length} private files! 🔒✅`);
+      addNotification({
+        title: "Batch Upload Complete",
+        description: `All ${files.length} files are now private and secured on Aptos.`,
+        type: "success"
+      });
       setFiles([]);
       setWallets([""]);
       setIsUploading(false);
@@ -191,6 +210,12 @@ export default function UploadPage() {
       setUploadProgress("");
       console.error("[ChainVault] Batch Upload Error:", err);
       toast.error("Upload failed: " + (err.message || "Unknown error"));
+      
+      addNotification({
+        title: "Upload Failed",
+        description: err.message || "An error occurred during the upload process.",
+        type: "error"
+      });
     }
   };
 

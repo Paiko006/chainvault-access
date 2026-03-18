@@ -8,9 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { fetchAccountBlobs, ShelbyBlob, formatBytes, fromShelbyTimestamp, fetchBlobData } from "@/lib/shelby-indexer";
 import { getVaultKey, decryptData, ENCRYPTION_PREFIX } from "@/lib/crypto";
+import { useNotifications } from "@/hooks/use-notifications";
 
 export default function FilesPage() {
   const { connected, account, signAndSubmitTransaction } = useWallet();
+  const { addNotification } = useNotifications();
   const [search, setSearch] = useState("");
   const [blobs, setBlobs] = useState<ShelbyBlob[]>([]);
   const [loading, setLoading] = useState(false);
@@ -96,6 +98,11 @@ export default function FilesPage() {
   const deleteBlobs = useDeleteBlobs({
     onSuccess: () => {
       toast.success("Asset deleted from Shelby network! 🗑️");
+      addNotification({
+        title: "File Deleted",
+        description: "An asset has been permanently removed from your vault.",
+        type: "warning"
+      });
       setRefresh((r) => r + 1);
     },
     onError: (err: any) => {
