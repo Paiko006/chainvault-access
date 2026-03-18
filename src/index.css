@@ -52,6 +52,12 @@
     --surface-glass: 240 8% 8%;
     --glow-primary: 260 80% 60%;
     --glow-accent: 190 90% 50%;
+
+    /* Canvas Text Demo Colors */
+    --color-blue-500: #3b82f6;
+    --color-sky-500: #0ea5e9;
+    --color-violet-500: #8b5cf6;
+    --color-teal-500: #14b8a6;
   }
 }
 
