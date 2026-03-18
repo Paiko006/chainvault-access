@@ -28,7 +28,7 @@ function saveToLocalStorage(blob: StoredBlob) {
 import { getVaultKey, encryptData, ENCRYPTION_PREFIX } from "@/lib/crypto";
 
 export default function UploadPage() {
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [wallets, setWallets] = useState<string[]>([""]);
   const [isEncrypting, setIsEncrypting] = useState(false);
@@ -37,22 +37,27 @@ export default function UploadPage() {
   const expirationMicros = (Date.now() + 1 * 365 * 24 * 60 * 60 * 1000) * 1000; // 1 year from now
 
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState("");
   const shelbyClient = useShelbyClient();
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
-    const f = e.dataTransfer.files[0];
-    if (f) setFile(f);
+    const newFiles = Array.from(e.dataTransfer.files).slice(0, 10);
+    setFiles(prev => [...prev, ...newFiles].slice(0, 10));
   }, []);
 
   const handleFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const f = e.target.files?.[0];
-      if (f) setFile(f);
+      const newFiles = Array.from(e.target.files || []).slice(0, 10);
+      setFiles(prev => [...prev, ...newFiles].slice(0, 10));
     },
     []
   );
+
+  const removeFile = (idx: number) => {
+    setFiles(files.filter((_, i) => i !== idx));
+  };
 
   const addWallet = () => setWallets([...wallets, ""]);
   const removeWallet = (i: number) =>
@@ -63,14 +68,13 @@ export default function UploadPage() {
     setWallets(next);
   };
 
-  // Manual upload logic to handle Testnet sync delays and 500 completion errors
   const handleUpload = async () => {
     if (!connected || !account || !signAndSubmitTransaction) {
       toast.error("Please connect your wallet first.");
       return;
     }
-    if (!file) {
-      toast.error("Please select a file to upload.");
+    if (files.length === 0) {
+      toast.error("Please select at least one file.");
       return;
     }
 
@@ -82,105 +86,110 @@ export default function UploadPage() {
 
     try {
       setIsEncrypting(true);
+      setUploadProgress("Preparing & Encrypting files...");
       
-      // 1. Get/Derive Vault Key
       const vaultKey = await getVaultKey(account.address.toString());
-      
-      // 2. Encrypt Data
-      const arrayBuffer = await file.arrayBuffer();
-      const encryptedBlob = await encryptData(arrayBuffer, vaultKey);
-      const encryptedData = new Uint8Array(await encryptedBlob.arrayBuffer());
+      const provider = await createDefaultErasureCodingProvider();
+      const preparedBlobs: { safeName: string; data: Uint8Array; commitments: any; numChunksets: number; originalSize: number }[] = [];
 
-      // 3. Prepare Safe Filename (Hybrid format: ENC-v1-name.ext.vault)
-      const baseName = file.name
-        .replace(/\.[^.]+$/, "")
-        .replace(/[^a-zA-Z0-9_-]/g, "_")
-        .slice(0, 30);
-      const ext = file.name.includes(".") ? file.name.split(".").pop() : "bin";
-      const safeFileName = `${ENCRYPTION_PREFIX}${baseName}.${ext}.vault`;
+      for (const file of files) {
+        setUploadProgress(`Encrypting: ${file.name}...`);
+        const arrayBuffer = await file.arrayBuffer();
+        const encryptedBlob = await encryptData(arrayBuffer, vaultKey);
+        const encryptedData = new Uint8Array(await encryptedBlob.arrayBuffer());
+
+        const baseName = file.name
+          .replace(/\.[^.]+$/, "")
+          .replace(/[^a-zA-Z0-9_-]/g, "_")
+          .slice(0, 30);
+        const ext = file.name.includes(".") ? file.name.split(".").pop() : "bin";
+        const safeFileName = `${ENCRYPTION_PREFIX}${baseName}.${ext}.vault`;
+
+        const commitments = await generateCommitments(provider, encryptedData);
+        const chunksetSize = provider.config.erasure_k * provider.config.chunkSizeBytes;
+        const numChunksets = expectedTotalChunksets(encryptedData.length, chunksetSize);
+
+        preparedBlobs.push({
+          safeName: safeFileName,
+          data: encryptedData,
+          commitments,
+          numChunksets,
+          originalSize: file.size
+        });
+      }
 
       setIsEncrypting(false);
       setIsUploading(true);
 
-      // 4. Generate Commitments for Blockchain
-      toast.info("Generating on-chain commitments...");
-      const provider = await createDefaultErasureCodingProvider();
-      const commitments = await generateCommitments(provider, encryptedData);
-      const chunksetSize = provider.config.erasure_k * provider.config.chunkSizeBytes;
-      const numChunksets = expectedTotalChunksets(encryptedData.length, chunksetSize);
-
-      // 5. Register on Aptos Blockchain
-      toast.info("Registering on Aptos... Please sign transaction.");
+      // 1. Batch Register on Aptos
+      setUploadProgress(`Registering ${files.length} files in 1 transaction...`);
       const pendingTx = await signAndSubmitTransaction({
         data: ShelbyBlobClient.createBatchRegisterBlobsPayload({
           account: AccountAddress.from(account.address.toString()),
           expirationMicros,
-          blobs: [
-            {
-              blobName: safeFileName,
-              blobSize: encryptedData.length,
-              blobMerkleRoot: commitments.blob_merkle_root,
-              numChunksets
-            }
-          ],
+          blobs: preparedBlobs.map(b => ({
+            blobName: b.safeName,
+            blobSize: b.data.length,
+            blobMerkleRoot: b.commitments.blob_merkle_root,
+            numChunksets: b.numChunksets
+          })),
           encoding: provider.config.enumIndex
         }),
-        options: {
-          maxGasAmount: 200000,
-        }
+        options: { maxGasAmount: 300000 }
       });
 
-      toast.info("Waiting for Aptos confirmation...");
+      setUploadProgress("Waiting for blockchain confirmation...");
       await shelbyClient.coordination.aptos.waitForTransaction({
         transactionHash: pendingTx.hash,
       });
 
-      // 6. CRITICAL SYNC DELAY: Wait for Shelby RPC node to see the on-chain commitments
-      // This prevents "Failed to complete multipart upload" 500 errors.
-      toast.info("Syncing with Shelby network (5s delay)...");
+      setUploadProgress("Syncing with network (5s delay)...");
       await new Promise(r => setTimeout(r, 5000));
 
-      // 7. Upload Data to RPC with Retry Logic
-      const uploadWithRetry = async (attempts = 3) => {
-        for (let i = 0; i < attempts; i++) {
-          try {
-            toast.info(`Uploading data to Shelby (Attempt ${i + 1}/${attempts})...`);
-            await shelbyClient.rpc.putBlob({
-              account: account.address.toString(),
-              blobName: safeFileName,
-              blobData: encryptedData,
-            });
-            return;
-          } catch (err: any) {
-            console.warn(`[ChainVault] Upload attempt ${i + 1} failed:`, err);
-            if (i === attempts - 1) throw err;
-            // Linear backoff
-            await new Promise(r => setTimeout(r, 3000 * (i + 1)));
+      // 2. Upload each file to RPC
+      for (let idx = 0; idx < preparedBlobs.length; idx++) {
+        const b = preparedBlobs[idx];
+        setUploadProgress(`Uploading (${idx + 1}/${preparedBlobs.length}): ${b.safeName}...`);
+
+        const uploadWithRetry = async (attempts = 3) => {
+          for (let i = 0; i < attempts; i++) {
+            try {
+              await shelbyClient.rpc.putBlob({
+                account: account.address.toString(),
+                blobName: b.safeName,
+                blobData: b.data,
+              });
+              return;
+            } catch (err: any) {
+              if (i === attempts - 1) throw err;
+              await new Promise(r => setTimeout(r, 3000 * (i + 1)));
+            }
           }
-        }
-      };
+        };
+        await uploadWithRetry();
 
-      await uploadWithRetry();
+        // Save progress to local storage
+        const sharedWith = wallets.filter(w => w.trim() !== "");
+        saveToLocalStorage({
+          blobName: b.safeName,
+          uploadedAt: Date.now(),
+          sizeBytes: b.originalSize,
+          ownerAddress: account.address.toString(),
+          expirationMicros,
+          sharedWith,
+        });
+      }
 
-      // 8. Success & Persistence
-      const sharedWith = wallets.filter(w => w.trim() !== "");
-      saveToLocalStorage({
-        blobName: safeFileName,
-        uploadedAt: Date.now(),
-        sizeBytes: file.size,
-        ownerAddress: account.address.toString(),
-        expirationMicros,
-        sharedWith,
-      });
-
-      toast.success("Private file secured & encrypted! 🔒✅");
-      setFile(null);
+      toast.success(`Successfully secured ${files.length} private files! 🔒✅`);
+      setFiles([]);
       setWallets([""]);
       setIsUploading(false);
+      setUploadProgress("");
     } catch (err: any) {
       setIsEncrypting(false);
       setIsUploading(false);
-      console.error("[ChainVault] Manual Upload Error:", err);
+      setUploadProgress("");
+      console.error("[ChainVault] Batch Upload Error:", err);
       toast.error("Upload failed: " + (err.message || "Unknown error"));
     }
   };
@@ -188,20 +197,16 @@ export default function UploadPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-8">
       <div>
-        <h1 className="text-2xl font-bold mb-1">Upload File</h1>
+        <h1 className="text-2xl font-bold mb-1">Batch Upload</h1>
         <p className="text-muted-foreground text-sm">
-          Upload a file to the{" "}
-          <span className="font-medium text-primary">Shelby testnet</span> and
-          set wallet-based access control.
+          Secure up to 10 files in a <span className="text-primary font-bold">single transaction</span> to save time and gas.
         </p>
       </div>
 
-      {/* Testnet info banner */}
       <div className="glass-card px-4 py-3 rounded-xl border border-primary/20 flex items-center justify-between gap-4">
         <div className="text-sm">
           <span className="text-muted-foreground">Network: </span>
           <span className="font-semibold text-primary">Aptos Testnet</span>
-          <span className="text-muted-foreground ml-3">Need testnet tokens? </span>
         </div>
         <a
           href="https://aptos.dev/en/network/faucet"
@@ -221,7 +226,7 @@ export default function UploadPage() {
         }}
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
-        className={`glass-card border-2 border-dashed transition-all duration-300 rounded-xl p-12 text-center cursor-pointer ${
+        className={`glass-card border-2 border-dashed transition-all duration-300 rounded-xl p-8 text-center cursor-pointer ${
           dragOver
             ? "border-accent glow-accent"
             : "border-border/50 hover:border-primary/40"
@@ -231,64 +236,54 @@ export default function UploadPage() {
         <input
           id="file-input"
           type="file"
+          multiple
           className="hidden"
           onChange={handleFileSelect}
         />
 
-        <AnimatePresence mode="wait">
-          {file ? (
-            <motion.div
-              key="preview"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="space-y-3"
-            >
-              <div className="h-16 w-16 rounded-xl bg-primary/10 flex items-center justify-center mx-auto">
-                <FileText className="h-8 w-8 text-primary" />
+        {files.length === 0 ? (
+          <div className="space-y-3">
+            <div className="h-16 w-16 rounded-xl bg-muted flex items-center justify-center mx-auto">
+              <Upload className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <div className="font-medium">Drag & drop files here</div>
+            <div className="text-xs text-muted-foreground">Up to 10 files. Encrypted locally via AES-256.</div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {files.map((f, i) => (
+              <div key={i} className="flex items-center gap-3 p-3 bg-secondary/30 rounded-lg border border-border/50 relative group">
+                <FileText className="h-5 w-5 text-primary shrink-0" />
+                <div className="text-left overflow-hidden">
+                  <div className="text-xs font-medium truncate">{f.name}</div>
+                  <div className="text-[10px] text-muted-foreground">{(f.size / 1024).toFixed(1)} KB</div>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeFile(i);
+                  }}
+                  className="absolute -top-2 -right-2 bg-destructive text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="h-3 w-3" />
+                </button>
               </div>
-              <div className="font-medium text-foreground">{file.name}</div>
-              <div className="text-xs text-muted-foreground">
-                {(file.size / 1024).toFixed(1)} KB
+            ))}
+            {files.length < 10 && (
+              <div className="flex items-center justify-center p-3 border border-dashed border-border/50 rounded-lg text-muted-foreground hover:text-primary transition-colors">
+                <Plus className="h-4 w-4 mr-2" /> Add More
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setFile(null);
-                }}
-                className="text-destructive"
-              >
-                <X className="h-3 w-3 mr-1" /> Remove
-              </Button>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="empty"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="space-y-3"
-            >
-              <div className="h-16 w-16 rounded-xl bg-muted flex items-center justify-center mx-auto">
-                <Upload className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <div className="font-medium text-foreground">
-                Drag & drop your file here
-              </div>
-              <div className="text-sm text-muted-foreground">
-                or click to browse
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Wallet access control */}
       <div className="glass-card p-6 rounded-xl space-y-4">
         <div>
-          <h3 className="font-semibold mb-1">Wallet Access Control</h3>
+          <h3 className="font-semibold mb-1">Shared Wallet Access</h3>
           <p className="text-sm text-muted-foreground">
-            Specify wallet addresses that can access this file.
+            Wallets that will be granted permission for <span className="text-accent underline">all</span> files in this batch.
           </p>
         </div>
 
@@ -302,12 +297,7 @@ export default function UploadPage() {
                 className="font-mono text-sm bg-secondary/50 border-border/50"
               />
               {wallets.length > 1 && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removeWallet(i)}
-                  className="shrink-0 text-destructive"
-                >
+                <Button variant="ghost" size="icon" onClick={() => removeWallet(i)} className="shrink-0 text-destructive">
                   <X className="h-4 w-4" />
                 </Button>
               )}
@@ -315,53 +305,47 @@ export default function UploadPage() {
           ))}
         </div>
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={addWallet}
-          className="gap-1"
-        >
+        <Button variant="outline" size="sm" onClick={addWallet} className="gap-1">
           <Plus className="h-3.5 w-3.5" /> Add Wallet
         </Button>
       </div>
 
-      {/* Upload button */}
       <Button
         variant="hero"
         size="lg"
         className="w-full rounded-xl py-6"
-        disabled={!file || !connected || isUploading || isEncrypting}
+        disabled={files.length === 0 || !connected || isUploading || isEncrypting}
         onClick={handleUpload}
       >
-        {isEncrypting ? (
+        {isEncrypting || isUploading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Encrypting Vault…
-          </>
-        ) : isUploading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Securing on testnet…
+            {uploadProgress}
           </>
         ) : !connected ? (
-          <>
-            <Upload className="mr-2 h-4 w-4" />
-            Connect Wallet to Upload
-          </>
+          "Connect Wallet to Upload"
         ) : (
           <>
             <Upload className="mr-2 h-4 w-4" />
-            Upload & Secure Private File
+            Sign & Secure {files.length} File{files.length > 1 ? 's' : ''}
           </>
         )}
       </Button>
 
       {(isUploading || isEncrypting) && (
-        <p className="text-center text-xs text-muted-foreground animate-pulse">
-          {isEncrypting 
-            ? "AES-GCM encryption in progress at source..." 
-            : "Registering on-chain → sync (5s) → uploading data…"}
-        </p>
+        <div className="space-y-2">
+          <div className="w-full bg-secondary/50 h-1.5 rounded-full overflow-hidden">
+            <motion.div 
+              className="bg-primary h-full"
+              initial={{ width: "0%" }}
+              animate={{ width: "100%" }}
+              transition={{ duration: 15, ease: "linear" }}
+            />
+          </div>
+          <p className="text-center text-[10px] text-muted-foreground uppercase tracking-widest animate-pulse font-bold">
+            DO NOT CLOSE THIS TAB • AES-256 VAULT IN PROGRESS
+          </p>
+        </div>
       )}
     </div>
   );
