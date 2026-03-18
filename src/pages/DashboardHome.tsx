@@ -278,6 +278,7 @@ export default function DashboardHome() {
               </thead>
               <tbody>
                 {blobs.slice(0, 10).map((b, idx) => {
+                  const cleanName = b.blob_name.includes('/') ? b.blob_name.split('/').slice(1).join('/') : b.blob_name;
                   return (
                     <tr
                       key={idx}
@@ -288,7 +289,7 @@ export default function DashboardHome() {
                            <div className="h-7 w-7 rounded bg-primary/10 flex items-center justify-center">
                               <FileText className="h-3.5 w-3.5 text-primary" />
                            </div>
-                           {b.blob_name.split('/').pop()}
+                           {cleanName}
                         </div>
                       </td>
                       <td className="px-5 py-3.5 text-muted-foreground hidden sm:table-cell">
@@ -300,7 +301,7 @@ export default function DashboardHome() {
                       <td className="px-5 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <a 
-                            href={`https://explorer.shelby.xyz/testnet/blob/${b.blob_name}`}
+                            href={`https://explorer.shelby.xyz/testnet/blobs/${b.owner}?blobName=${encodeURIComponent(cleanName)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                           >
