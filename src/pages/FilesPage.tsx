@@ -49,7 +49,9 @@ export default function FilesPage() {
     try {
       // Indexer returns "@address/suffix". Strip prefix for logic.
       const cleanName = b.blob_name.includes('/') ? b.blob_name.split('/').slice(1).join('/') : b.blob_name;
-      const isEncrypted = cleanName.startsWith(ENCRYPTION_PREFIX) || cleanName.startsWith("ENC:v1:");
+      const isEncrypted = cleanName.startsWith(ENCRYPTION_PREFIX) || 
+                          cleanName.startsWith("ENC:v1:") || 
+                          cleanName.toLowerCase().endsWith(".vault");
       
       toast.loading(isEncrypted ? "Decrypting from Vault..." : "Downloading from Shelby...", { id: "dl-toast" });
 
@@ -71,8 +73,11 @@ export default function FilesPage() {
       const url = window.URL.createObjectURL(finalBlob);
       const a = document.createElement("a");
       a.href = url;
-      // Remove encryption prefix for the saved filename
-      const fileNameForUser = cleanName.replace(ENCRYPTION_PREFIX, "").replace("ENC:v1:", "");
+      // Clean filename for user: remove both prefix and .vault extension
+      const fileNameForUser = cleanName
+        .replace(ENCRYPTION_PREFIX, "")
+        .replace("ENC:v1:", "")
+        .replace(/\.vault$/i, "");
       a.download = fileNameForUser;
       document.body.appendChild(a);
       a.click();
@@ -246,9 +251,11 @@ export default function FilesPage() {
               <tbody>
                 {filtered.map((b, idx) => {
                   const cleanName = b.blob_name.includes('/') ? b.blob_name.split('/').slice(1).join('/') : b.blob_name;
-                  const isEncrypted = cleanName.startsWith(ENCRYPTION_PREFIX) || cleanName.startsWith("ENC:v1:");
+                  const isEncrypted = cleanName.startsWith(ENCRYPTION_PREFIX) || 
+                                      cleanName.startsWith("ENC:v1:") || 
+                                      cleanName.toLowerCase().endsWith(".vault");
                   const displayName = isEncrypted 
-                    ? cleanName.replace(ENCRYPTION_PREFIX, "").replace("ENC:v1:", "") 
+                    ? cleanName.replace(ENCRYPTION_PREFIX, "").replace("ENC:v1:", "").replace(/\.vault$/i, "")
                     : cleanName;
                   const isDownloading = downloadingId === b.blob_name;
 

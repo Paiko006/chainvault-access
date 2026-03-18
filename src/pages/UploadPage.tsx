@@ -91,13 +91,13 @@ export default function UploadPage() {
       const encryptedBlob = await encryptData(arrayBuffer, vaultKey);
       const encryptedData = new Uint8Array(await encryptedBlob.arrayBuffer());
 
-      // 3. Prepare Safe Filename
+      // 3. Prepare Safe Filename (Hybrid format: ENC-v1-name.ext.vault)
       const baseName = file.name
         .replace(/\.[^.]+$/, "")
         .replace(/[^a-zA-Z0-9_-]/g, "_")
         .slice(0, 30);
       const ext = file.name.includes(".") ? file.name.split(".").pop() : "bin";
-      const safeFileName = `${ENCRYPTION_PREFIX}${baseName}_${Date.now()}.${ext}`;
+      const safeFileName = `${ENCRYPTION_PREFIX}${baseName}.${ext}.vault`;
 
       setIsEncrypting(false);
       setIsUploading(true);
