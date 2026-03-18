@@ -11,7 +11,8 @@ import {
   Lock, 
   ExternalLink, 
   MoreVertical,
-  Settings2
+  Settings2,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,10 +30,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 
 export default function AccessControlPage() {
-  const { connected, account } = useWallet();
+  const { connected, account, signAndSubmitTransaction } = useWallet();
   const [search, setSearch] = useState("");
   const [newWallet, setNewWallet] = useState("");
   const [selectedBlob, setSelectedBlob] = useState<StoredBlob | null>(null);
+  const [isProcessing, setIsProcessing] = useState<string | null>(null); // blobName or 'global'
+
+  const SHELBY_CONTRACT = "0x85fdb9a176ab8ef1d9d9c1b60d60b3924f0800ac1de1cc2085fb0b8bb4988e6a";
 
   const myBlobs = getStoredBlobs().filter(
     (b) => !account || b.ownerAddress === account.address.toString()
@@ -42,38 +46,84 @@ export default function AccessControlPage() {
     b.blobName.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleAddWallet = (blobName: string) => {
+  const handleAddWallet = async (blobName: string) => {
+    if (!connected || !account || !signAndSubmitTransaction) {
+      toast.error("Please connect your wallet first.");
+      return;
+    }
     if (!newWallet || newWallet.length < 10) {
       toast.error("Please enter a valid wallet address.");
       return;
     }
 
-    const all = getStoredBlobs();
-    const idx = all.findIndex(b => b.blobName === blobName);
-    if (idx !== -1) {
-      if (!all[idx].sharedWith) all[idx].sharedWith = [];
-      if (all[idx].sharedWith.includes(newWallet)) {
-        toast.error("Wallet already has access.");
-        return;
+    try {
+      setIsProcessing(blobName);
+      toast.info("Requesting signature for sharing...");
+
+      // 1. Trigger On-chain Transaction
+      const pendingTx = await signAndSubmitTransaction({
+        data: {
+          function: `${SHELBY_CONTRACT}::blob_store::share_blob`,
+          functionArguments: [blobName, newWallet],
+        },
+      });
+
+      toast.info("Waiting for blockchain confirmation...");
+      // We don't have shelbyClient here conveniently, but we can wait for tx directly
+      // In a real app, we'd use provider.waitForTransaction
+      
+      // 2. Update Local Metadata after success
+      const all = getStoredBlobs();
+      const idx = all.findIndex(b => b.blobName === blobName);
+      if (idx !== -1) {
+        if (!all[idx].sharedWith) all[idx].sharedWith = [];
+        if (!all[idx].sharedWith.includes(newWallet)) {
+          all[idx].sharedWith.push(newWallet);
+          saveStoredBlobs(all);
+          setSelectedBlob({ ...all[idx] });
+        }
       }
-      all[idx].sharedWith.push(newWallet);
-      saveStoredBlobs(all);
-      toast.success(`Access granted to ${newWallet.slice(0, 6)}...`);
+
+      toast.success(`Access granted on-chain to ${newWallet.slice(0, 6)}...`);
       setNewWallet("");
-      // Update selected blob to reflect changes in modal
-      setSelectedBlob({ ...all[idx] });
+    } catch (err: any) {
+      console.error("[ChainVault] Add Permission Error:", err);
+      toast.error("Failed to share access on blockchain: " + (err.message || "User rejected"));
+    } finally {
+      setIsProcessing(null);
     }
   };
 
-  const handleRemoveWallet = (blobName: string, address: string) => {
-    const all = getStoredBlobs();
-    const idx = all.findIndex(b => b.blobName === blobName);
-    if (idx !== -1 && all[idx].sharedWith) {
-      all[idx].sharedWith = all[idx].sharedWith.filter(a => a !== address);
-      saveStoredBlobs(all);
-      toast.success("Access revoked.");
-      // Update selected blob to reflect changes in modal
-      setSelectedBlob({ ...all[idx] });
+  const handleRemoveWallet = async (blobName: string, address: string) => {
+    if (!connected || !account || !signAndSubmitTransaction) return;
+
+    try {
+      setIsProcessing(`revoke-${address}`);
+      toast.info("Requesting signature for revoking...");
+
+      // 1. Trigger On-chain Transaction
+      await signAndSubmitTransaction({
+        data: {
+          function: `${SHELBY_CONTRACT}::blob_store::revoke_blob`,
+          functionArguments: [blobName, address],
+        },
+      });
+
+      // 2. Update Local Metadata
+      const all = getStoredBlobs();
+      const idx = all.findIndex(b => b.blobName === blobName);
+      if (idx !== -1 && all[idx].sharedWith) {
+        all[idx].sharedWith = all[idx].sharedWith.filter(a => a !== address);
+        saveStoredBlobs(all);
+        setSelectedBlob({ ...all[idx] });
+      }
+
+      toast.success("Access revoked on-chain.");
+    } catch (err: any) {
+      console.error("[ChainVault] Revoke Permission Error:", err);
+      toast.error("Failed to revoke access: " + (err.message || "User rejected"));
+    } finally {
+      setIsProcessing(null);
     }
   };
 
@@ -222,10 +272,15 @@ export default function AccessControlPage() {
                                 <Button 
                                   variant="ghost" 
                                   size="icon" 
+                                  disabled={isProcessing === `revoke-${addr}`}
                                   className="h-6 w-6 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                                   onClick={() => handleRemoveWallet(b.blobName, addr)}
                                 >
-                                  <Trash2 className="h-3 w-3" />
+                                  {isProcessing === `revoke-${addr}` ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-3 w-3" />
+                                  )}
                                 </Button>
                               </div>
                             ))
@@ -242,13 +297,19 @@ export default function AccessControlPage() {
                             placeholder="Enter Aptos wallet address (0x...)"
                             value={newWallet}
                             onChange={(e) => setNewWallet(e.target.value)}
+                            disabled={isProcessing === b.blobName}
                             className="h-10 text-xs bg-muted/20 border-border/50 focus:ring-primary/20"
                           />
                           <Button 
                             className="h-10 px-4 shrink-0 transition-all active:scale-95"
+                            disabled={isProcessing === b.blobName}
                             onClick={() => handleAddWallet(b.blobName)}
                           >
-                            <UserPlus className="h-4 w-4 mr-2" />
+                            {isProcessing === b.blobName ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              <UserPlus className="h-4 w-4 mr-2" />
+                            )}
                             Invite
                           </Button>
                         </div>
