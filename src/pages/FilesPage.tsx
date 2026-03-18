@@ -77,9 +77,10 @@ export default function FilesPage() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       
-    } catch (err) {
-      console.error("Download/Decrypt error:", err);
-      toast.error("Failed to process file. Check your vault key.", { id: "dl-toast" });
+    } catch (err: any) {
+      console.error("[ChainVault] Download/Decrypt error:", err);
+      const errorMsg = err?.message || "Check your vault key or internet connection.";
+      toast.error(`Error: ${errorMsg}`, { id: "dl-toast" });
     } finally {
       setDownloadingId(null);
     }
@@ -108,7 +109,10 @@ export default function FilesPage() {
     try {
       await deleteBlobs.mutateAsync({
         blobNames: [blobToDelete.blob_name],
-        signAndSubmitTransaction,
+        signer: {
+          account: account.address,
+          signAndSubmitTransaction,
+        },
       });
     } catch (error) {
        // Handled by onError hook
@@ -270,7 +274,7 @@ export default function FilesPage() {
                       <td className="px-5 py-3.5">
                         <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-accent/10 text-accent">
                           <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-                          Permanent
+                          1 Year Vault
                         </span>
                       </td>
                       <td className="px-5 py-3.5 text-right">
@@ -290,7 +294,7 @@ export default function FilesPage() {
                             )}
                           </Button>
                           <a
-                            href={`https://explorer.shelby.xyz/testnet/blob/${b.blob_name}`}
+                            href={`https://explorer.shelby.xyz/testnet/blob/${encodeURIComponent(b.blob_name)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                           >
