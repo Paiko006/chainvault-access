@@ -15,7 +15,7 @@ query {
 async function main() {
   const response = await fetch('https://api.testnet.aptoslabs.com/nocode/v1/public/alias/shelby/testnet/v1/graphql', {
     method: 'POST',
-    headers: { 
+    headers: {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer AG-7FPFEZSPINUP4F7HKVSIO1ZPOEDZ8E5WN'
     },
