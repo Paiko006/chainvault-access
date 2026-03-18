@@ -67,20 +67,33 @@ export async function fetchBlobData(blobName: string): Promise<Blob> {
   const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || "AG-7FPFEZSPINUP4F7HKVSIO1ZPOEDZ8E5WN";
   // Important: URI encode the blob name because it contains colons (ENC:v1:)
   const url = `https://api.testnet.aptoslabs.com/nocode/v1/public/alias/shelby/testnet/v1/blob/${encodeURIComponent(blobName)}`;
-  
-  const response = await fetch(url, {
-    headers: {
-      "Authorization": `Bearer ${apiKey}`
-    }
-  });
 
-  if (!response.ok) {
-    if (response.status === 404) throw new Error("File not found on Shelby network. It might still be syncing.");
-    if (response.status === 401) throw new Error("Unauthorized. Please check your API Key in Settings.");
+  const maxAttempts = 3;
+  const delayMs = 2000;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const response = await fetch(url, {
+      headers: {
+        "Authorization": `Bearer ${apiKey}`
+      }
+    });
+    if (response.ok) {
+      return await response.blob();
+    }
+    if (response.status === 404 && attempt < maxAttempts) {
+      // Might still be syncing, wait and retry
+      await new Promise(r => setTimeout(r, delayMs));
+      continue;
+    }
+    if (response.status === 404) {
+      throw new Error("File not found on Shelby network. It might still be syncing.");
+    }
+    if (response.status === 401) {
+      throw new Error("Unauthorized. Please check your API Key in Settings.");
+    }
     throw new Error(`Network error (${response.status}): ${response.statusText}`);
   }
-  
-  return await response.blob();
+  // Should never reach here
+  throw new Error("Failed to fetch blob after multiple attempts.");
 }
 
 /**
