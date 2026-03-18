@@ -3,7 +3,14 @@ import { Upload, X, Plus, FileText, Loader2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
-import { useUploadBlobs } from "@shelby-protocol/react";
+import { useShelbyClient } from "@shelby-protocol/react";
+import { 
+  ShelbyBlobClient, 
+  createDefaultErasureCodingProvider, 
+  generateCommitments, 
+  expectedTotalChunksets,
+  AccountAddress 
+} from "@shelby-protocol/sdk/browser";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { toast } from "sonner";
 import { BLOBS_STORAGE_KEY, StoredBlob, getStoredBlobs, saveStoredBlobs } from "@/types/storage";
@@ -29,23 +36,8 @@ export default function UploadPage() {
 
   const expirationMicros = (Date.now() + 1 * 365 * 24 * 60 * 60 * 1000) * 1000; // 1 year from now
 
-  const uploadBlobs = useUploadBlobs({
-    onSuccess: () => {
-      // Logic moved to mutate call
-    },
-    onError: (error: any) => {
-      console.error("[ChainVault] Upload error:", error);
-      const msg = error?.message || "";
-      const status = error?.response?.status;
-      setIsEncrypting(false);
-
-      if (status === 401 || msg.includes("401") || msg.includes("Unauthorized")) {
-        toast.error("🔐 Auth Error: Check API Key/Whitelist.");
-      } else {
-        toast.error("Upload failed: " + (msg || "Unknown error"));
-      }
-    },
-  });
+  const [isUploading, setIsUploading] = useState(false);
+  const shelbyClient = useShelbyClient();
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -71,6 +63,7 @@ export default function UploadPage() {
     setWallets(next);
   };
 
+  // Manual upload logic to handle Testnet sync delays and 500 completion errors
   const handleUpload = async () => {
     if (!connected || !account || !signAndSubmitTransaction) {
       toast.error("Please connect your wallet first.");
@@ -81,7 +74,7 @@ export default function UploadPage() {
       return;
     }
 
-    const apiKey = import.meta.env.VITE_SHELBY_API_KEY;
+    const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY;
     if (!apiKey) {
       toast.error("API Key missing.");
       return;
@@ -98,62 +91,96 @@ export default function UploadPage() {
       const encryptedBlob = await encryptData(arrayBuffer, vaultKey);
       const encryptedData = new Uint8Array(await encryptedBlob.arrayBuffer());
 
-      // 3. Prepare Safe Filename with Encryption Prefix
+      // 3. Prepare Safe Filename
       const baseName = file.name
         .replace(/\.[^.]+$/, "")
         .replace(/[^a-zA-Z0-9_-]/g, "_")
         .slice(0, 30);
       const ext = file.name.includes(".") ? file.name.split(".").pop() : "bin";
-      
-      // Mark as encrypted so FilesPage knows how to handle it
       const safeFileName = `${ENCRYPTION_PREFIX}${baseName}_${Date.now()}.${ext}`;
 
-      // 4. Submit to Shelby
-      uploadBlobs.mutate({
-        signer: {
-          account: account.address.toString(),
-          signAndSubmitTransaction,
-        },
-        blobs: [
-          {
-            blobName: safeFileName,
-            blobData: encryptedData,
-          },
-        ],
-        expirationMicros,
-        options: {
-          build: {
-            options: {
-              maxGasAmount: 200000,
+      setIsEncrypting(false);
+      setIsUploading(true);
+
+      // 4. Generate Commitments for Blockchain
+      toast.info("Generating on-chain commitments...");
+      const provider = await createDefaultErasureCodingProvider();
+      const commitments = await generateCommitments(provider, encryptedData);
+      const chunksetSize = provider.config.erasure_k * provider.config.chunkSizeBytes;
+      const numChunksets = expectedTotalChunksets(encryptedData.length, chunksetSize);
+
+      // 5. Register on Aptos Blockchain
+      toast.info("Registering on Aptos... Please sign transaction.");
+      const pendingTx = await signAndSubmitTransaction({
+        data: ShelbyBlobClient.createBatchRegisterBlobsPayload({
+          account: AccountAddress.from(account.address.toString()),
+          expirationMicros,
+          blobs: [
+            {
+              blobName: safeFileName,
+              blobSize: encryptedData.length,
+              blobMerkleRoot: commitments.blob_merkle_root,
+              numChunksets
             }
-          }
-        }
-      }, {
-        onSuccess: async () => {
-          // Give indexer a moment to process before showing success
-          toast.info("Syncing with network...");
-          await new Promise(r => setTimeout(r, 2000));
-          
-          setIsEncrypting(false);
-          const sharedWith = wallets.filter(w => w.trim() !== "");
-          
-          saveToLocalStorage({
-            blobName: safeFileName,
-            uploadedAt: Date.now(),
-            sizeBytes: file.size,
-            ownerAddress: account.address.toString(),
-            expirationMicros,
-            sharedWith,
-          });
-          toast.success("Private file secured & encrypted! 🔒✅");
-          setFile(null);
-          setWallets([""]);
+          ]
+        }),
+        options: {
+          maxGasAmount: 200000,
         }
       });
-    } catch (err) {
+
+      toast.info("Waiting for Aptos confirmation...");
+      await shelbyClient.coordination.aptos.waitForTransaction({
+        transactionHash: pendingTx.hash,
+      });
+
+      // 6. CRITICAL SYNC DELAY: Wait for Shelby RPC node to see the on-chain commitments
+      // This prevents "Failed to complete multipart upload" 500 errors.
+      toast.info("Syncing with Shelby network (5s delay)...");
+      await new Promise(r => setTimeout(r, 5000));
+
+      // 7. Upload Data to RPC with Retry Logic
+      const uploadWithRetry = async (attempts = 3) => {
+        for (let i = 0; i < attempts; i++) {
+          try {
+            toast.info(`Uploading data to Shelby (Attempt ${i + 1}/${attempts})...`);
+            await shelbyClient.rpc.putBlob({
+              account: account.address.toString(),
+              blobName: safeFileName,
+              blobData: encryptedData,
+            });
+            return;
+          } catch (err: any) {
+            console.warn(`[ChainVault] Upload attempt ${i + 1} failed:`, err);
+            if (i === attempts - 1) throw err;
+            // Linear backoff
+            await new Promise(r => setTimeout(r, 3000 * (i + 1)));
+          }
+        }
+      };
+
+      await uploadWithRetry();
+
+      // 8. Success & Persistence
+      const sharedWith = wallets.filter(w => w.trim() !== "");
+      saveToLocalStorage({
+        blobName: safeFileName,
+        uploadedAt: Date.now(),
+        sizeBytes: file.size,
+        ownerAddress: account.address.toString(),
+        expirationMicros,
+        sharedWith,
+      });
+
+      toast.success("Private file secured & encrypted! 🔒✅");
+      setFile(null);
+      setWallets([""]);
+      setIsUploading(false);
+    } catch (err: any) {
       setIsEncrypting(false);
-      console.error("[ChainVault] Encryption/Upload Error:", err);
-      toast.error("Process failed: Encryption error.");
+      setIsUploading(false);
+      console.error("[ChainVault] Manual Upload Error:", err);
+      toast.error("Upload failed: " + (err.message || "Unknown error"));
     }
   };
 
@@ -302,7 +329,7 @@ export default function UploadPage() {
         variant="hero"
         size="lg"
         className="w-full rounded-xl py-6"
-        disabled={!file || !connected || uploadBlobs.isPending || isEncrypting}
+        disabled={!file || !connected || isUploading || isEncrypting}
         onClick={handleUpload}
       >
         {isEncrypting ? (
@@ -310,7 +337,7 @@ export default function UploadPage() {
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             Encrypting Vault…
           </>
-        ) : uploadBlobs.isPending ? (
+        ) : isUploading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             Securing on testnet…
@@ -328,11 +355,11 @@ export default function UploadPage() {
         )}
       </Button>
 
-      {(uploadBlobs.isPending || isEncrypting) && (
+      {(isUploading || isEncrypting) && (
         <p className="text-center text-xs text-muted-foreground animate-pulse">
           {isEncrypting 
             ? "AES-GCM encryption in progress at source..." 
-            : "Registering on-chain → uploading encrypted blob…"}
+            : "Registering on-chain → sync (5s) → uploading data…"}
         </p>
       )}
     </div>
