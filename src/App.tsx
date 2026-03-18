@@ -13,7 +13,7 @@ import SharedPage from "./pages/SharedPage.tsx";
 import AccessControlPage from "./pages/AccessControlPage.tsx";
 import SettingsPage from "./pages/SettingsPage.tsx";
 import ExplorerPage from "./pages/ExplorerPage.tsx";
-import LockerPage from "./pages/LockerPage.tsx";
+import { useEffect, useMemo } from "react";
 
 import { Network } from "@aptos-labs/ts-sdk";
 import * as AptosWallet from "@aptos-labs/wallet-adapter-react";
@@ -21,24 +21,85 @@ import { AptosCoreProvider } from "./components/wallet/AptosCoreProvider";
 import { ShelbyClient } from "@shelby-protocol/sdk/browser";
 import { ShelbyClientProvider } from "@shelby-protocol/react";
 
-import { useMemo } from "react";
-
 const App = () => {
   // Priority: localStorage (from Settings UI) > environment variables
   const shelbyApiKey = (localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY)?.trim();
   const aptosApiKey = import.meta.env.VITE_APTOS_API_KEY?.trim();
 
-  // Diagnostics inside the component lifecycle
-  useMemo(() => {
-    if (typeof window !== "undefined") {
-      console.log("%c[ChainVault Deployment Info]", "color: #10b981; font-weight: bold;");
-      console.log("Origin:", window.location.origin);
-      console.log("Shelby Key:", shelbyApiKey ? `Detected (${shelbyApiKey.slice(0, 5)}...)` : "NOT FOUND");
-      if (!shelbyApiKey) {
-        console.error("CRITICAL: VITE_SHELBY_API_KEY is missing! Check Vercel Environment Variables.");
+  // Security & Anti-Copy logic
+  useEffect(() => {
+    // 1. Disable Right Click
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+
+    // 2. Disable F12 and Ctrl+Shift+I/J/U (Inspect/Source)
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.key === "F12" ||
+        (e.ctrlKey && e.shiftKey && (e.key === "I" || e.key === "J" || e.key === "C")) ||
+        (e.ctrlKey && e.key === "u")
+      ) {
+        e.preventDefault();
       }
-    }
-  }, [shelbyApiKey]);
+    };
+
+    // 3. Prevent Text Selection & Image Dragging via CSS
+    const style = document.createElement("style");
+    style.innerHTML = `
+      * {
+        -webkit-user-select: none !important;
+        -moz-user-select: none !important;
+        -ms-user-select: none !important;
+        user-select: none !important;
+        -webkit-user-drag: none !important;
+      }
+      input, textarea {
+        -webkit-user-select: text !important;
+        -moz-user-select: text !important;
+        -ms-user-select: text !important;
+        user-select: text !important;
+      }
+    `;
+
+    // 4. Console Protection & DevTools Detection
+    const protectConsole = () => {
+      if (typeof window !== "undefined") {
+        const devtools = {
+          isOpen: false,
+          orientation: undefined as string | undefined,
+        };
+        const threshold = 160;
+        const emitEvent = () => {
+          console.clear();
+          console.log("%c[Security Active]", "color: #10b981; font-size: 30px; font-weight: bold;");
+          console.log("Technology & Source are protected. Unauthorized inspection is discouraged.");
+        };
+
+        const check = () => {
+          const widthThreshold = window.outerWidth - window.innerWidth > threshold;
+          const heightThreshold = window.outerHeight - window.innerHeight > threshold;
+          if (widthThreshold || heightThreshold) {
+            emitEvent();
+          }
+        };
+        setInterval(check, 1000);
+      }
+    };
+
+    document.head.appendChild(style);
+    window.addEventListener("contextmenu", handleContextMenu);
+    window.addEventListener("keydown", handleKeyDown);
+    protectConsole();
+
+    return () => {
+      window.removeEventListener("contextmenu", handleContextMenu);
+      window.removeEventListener("keydown", handleKeyDown);
+      if (document.head.contains(style)) {
+        document.head.removeChild(style);
+      }
+    };
+  }, []);
 
   const queryClient = useMemo(() => new QueryClient({
     defaultOptions: {
@@ -50,7 +111,6 @@ const App = () => {
   const shelbyClient = useMemo(() => new ShelbyClient({
     network: Network.TESTNET,
     apiKey: shelbyApiKey,
-    // Explicitly set base URLs to ensure keys are passed to correct endpoints
     rpc: {
       baseUrl: "https://api.testnet.shelby.xyz/shelby",
       apiKey: shelbyApiKey,
@@ -92,7 +152,6 @@ const App = () => {
                     <Route path="settings" element={<SettingsPage />} />
                     <Route path="explorer" element={<ExplorerPage />} />
                   </Route>
-                  <Route path="/locker" element={<LockerPage />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </BrowserRouter>
