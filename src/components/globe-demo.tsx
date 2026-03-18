@@ -59,26 +59,26 @@ export default function GlobeDemo() {
   ];
 
   return (
-    <div className="flex flex-row items-center justify-center py-20 h-screen md:h-auto dark:bg-black bg-white relative w-full">
-      <div className="max-w-7xl mx-auto w-full relative overflow-hidden h-full md:h-[40rem] px-4">
+    <div className="flex flex-col items-center justify-center py-12 md:py-24 min-h-[600px] md:h-auto dark:bg-black bg-white relative w-full overflow-hidden">
+      <div className="max-w-7xl mx-auto w-full relative h-[40rem] md:h-[45rem] px-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 1 }}
-          className="relative z-10"
+          className="relative z-20"
         >
           <div className="flex flex-col items-center justify-center">
-            <div className="px-3 py-1 mb-4 rounded-full border border-primary/20 bg-primary/5 text-xs font-medium text-primary flex items-center gap-2">
+            <div className="px-3 py-1 mb-4 rounded-full border border-primary/20 bg-primary/5 text-[10px] md:text-xs font-medium text-primary flex items-center gap-2">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
               </span>
               Live Storage Network
             </div>
-            <h2 className="text-center text-xl md:text-5xl font-bold text-black dark:text-white">
+            <h2 className="text-center text-2xl md:text-5xl font-bold text-black dark:text-white tracking-tight">
               Securing Data Worldwide
             </h2>
-            <p className="text-center text-base md:text-lg font-normal text-neutral-700 dark:text-neutral-200 max-w-2xl mt-4 mx-auto">
+            <p className="text-center text-sm md:text-lg font-normal text-neutral-600 dark:text-neutral-400 max-w-xl mt-4 mx-auto leading-relaxed">
               Real-time visualization of {providers.length || "active"} Storage Providers across the Shelby Testnet. 
               {loading ? " Fetching network state..." : " Your data is decentralized and globally distributed."}
             </p>
@@ -87,7 +87,7 @@ export default function GlobeDemo() {
         
         <div className="absolute w-full bottom-0 inset-x-0 h-40 bg-gradient-to-b pointer-events-none select-none from-transparent dark:to-black to-white z-40" />
         
-        <div className="absolute w-full -bottom-20 h-72 md:h-full z-10">
+        <div className="absolute w-full -bottom-12 md:-bottom-20 h-[32rem] md:h-full z-10">
           <Suspense fallback={
             <div className="flex items-center justify-center h-full w-full">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
