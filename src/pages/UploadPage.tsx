@@ -8,9 +8,9 @@ import {
   ShelbyBlobClient, 
   createDefaultErasureCodingProvider, 
   generateCommitments, 
-  expectedTotalChunksets,
-  AccountAddress 
+  expectedTotalChunksets
 } from "@shelby-protocol/sdk/browser";
+import { AccountAddress } from "@aptos-labs/ts-sdk";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { toast } from "sonner";
 import { BLOBS_STORAGE_KEY, StoredBlob, getStoredBlobs, saveStoredBlobs } from "@/types/storage";
@@ -122,7 +122,8 @@ export default function UploadPage() {
               blobMerkleRoot: commitments.blob_merkle_root,
               numChunksets
             }
-          ]
+          ],
+          encoding: provider.config.enumIndex
         }),
         options: {
           maxGasAmount: 200000,
