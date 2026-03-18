@@ -1,43 +1,46 @@
-import { useState } from "react";
-import { Share2, FileText, Trash2, ExternalLink, Upload, Search, X, Loader2, Compass } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Share2, FileText, Trash2, ExternalLink, Upload, Search, X, Loader2, Compass, RefreshCw } from "lucide-react";
 import { useDeleteBlobs } from "@shelby-protocol/react";
 import { toast } from "sonner";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { BLOBS_STORAGE_KEY, StoredBlob, getStoredBlobs, saveStoredBlobs } from "@/types/storage";
-
-function formatBytes(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-}
-
-function formatDate(ms: number) {
-  return new Date(ms).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
+import { fetchAccountBlobs, ShelbyBlob, formatBytes, fromShelbyTimestamp } from "@/lib/shelby-indexer";
 
 export default function FilesPage() {
   const { connected, account, signAndSubmitTransaction } = useWallet();
   const [search, setSearch] = useState("");
+  const [blobs, setBlobs] = useState<ShelbyBlob[]>([]);
+  const [loading, setLoading] = useState(false);
   const [refresh, setRefresh] = useState(0);
 
-  const allBlobs = getStoredBlobs().filter(
-    (b) => !account || b.ownerAddress === account.address.toString()
-  );
+  useEffect(() => {
+    async function loadData() {
+      if (connected && account) {
+        setLoading(true);
+        try {
+          const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || "";
+          const data = await fetchAccountBlobs(account.address.toString(), apiKey);
+          setBlobs(data);
+        } catch (err) {
+          console.error("Failed to fetch files:", err);
+          toast.error("Failed to sync with Shelby network");
+        } finally {
+          setLoading(false);
+        }
+      }
+    }
+    loadData();
+  }, [connected, account, refresh]);
 
-  const filtered = allBlobs.filter((b) =>
-    b.blobName.toLowerCase().includes(search.toLowerCase())
+  const filtered = blobs.filter((b) =>
+    b.blob_name.toLowerCase().includes(search.toLowerCase())
   );
 
   const deleteBlobs = useDeleteBlobs({
     onSuccess: () => {
-      toast.success("File deleted from Shelby network! 🗑️");
+      toast.success("Asset deleted from Shelby network! 🗑️");
       setRefresh((r) => r + 1);
     },
     onError: (err: any) => {
@@ -48,34 +51,21 @@ export default function FilesPage() {
 
   const handleDelete = async (idx: number) => {
     if (!connected || !account || !signAndSubmitTransaction) {
-      toast.error("Please connect your wallet first.");
+      toast.error("Please connect your wallet first");
       return;
     }
 
-    const target = filtered[idx];
-    
-    // 1. Transaction on-chain (Soft Delete)
-    deleteBlobs.mutate({
-      signer: {
-        account: account.address,
-        signAndSubmitTransaction
-      },
-      blobNames: [target.blobName]
-    }, {
-      onSuccess: () => {
-        // 2. Clear local storage ONLY after success
-        const realBlobs = getStoredBlobs();
-        const realIdx = realBlobs.findIndex(
-          (b) => b.blobName === target.blobName && b.uploadedAt === target.uploadedAt
-        );
-        
-        if (realIdx !== -1) {
-          const blobs = getStoredBlobs();
-          blobs.splice(realIdx, 1);
-          saveStoredBlobs(blobs);
-        }
-      }
-    });
+    const blobToDelete = filtered[idx];
+    if (!blobToDelete) return;
+
+    try {
+      await deleteBlobs.mutateAsync({
+        blobNames: [blobToDelete.blob_name],
+        signAndSubmitTransaction,
+      });
+    } catch (error) {
+       // Handled by onError hook
+    }
   };
 
   if (!connected) {
@@ -106,22 +96,34 @@ export default function FilesPage() {
             <span className="font-medium text-primary">Shelby testnet</span>.
           </p>
         </div>
-        <Link to="/dashboard/upload">
-          <Button variant="hero" size="sm" className="gap-2">
-            <Upload className="h-3.5 w-3.5" />
-            Upload File
-          </Button>
-        </Link>
+        <div className="flex items-center gap-3">
+           <Button 
+             variant="outline" 
+             size="sm" 
+             onClick={() => setRefresh(r => r + 1)}
+             disabled={loading}
+             className="gap-2"
+           >
+             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+             Sync
+           </Button>
+           <Link to="/dashboard/upload">
+             <Button variant="hero" size="sm" className="gap-2">
+               <Upload className="h-3.5 w-3.5" />
+               Upload File
+             </Button>
+           </Link>
+        </div>
       </div>
 
       {/* Search */}
-      {allBlobs.length > 0 && (
+      {(blobs.length > 0 || search) && (
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search files…"
+            placeholder="Search assets..."
             className="pl-9 bg-secondary/50 border-border/50"
           />
           {search && (
@@ -135,25 +137,32 @@ export default function FilesPage() {
         </div>
       )}
 
-      {allBlobs.length === 0 ? (
+      {loading && blobs.length === 0 ? (
+        <div className="py-20 flex flex-col items-center justify-center gap-4">
+           <Loader2 className="h-10 w-10 text-primary animate-spin" />
+           <p className="text-sm text-muted-foreground animate-pulse font-bold uppercase tracking-widest">
+             Connecting to Shelby Indexer...
+           </p>
+        </div>
+      ) : blobs.length === 0 ? (
         <div className="glass-card p-14 text-center rounded-xl space-y-4">
           <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center mx-auto">
             <FileText className="h-6 w-6 text-muted-foreground" />
           </div>
           <p className="text-muted-foreground text-sm">
-            No files yet — upload your first file to get started.
+            No files found on Shelby Explorer for this account.
           </p>
           <Link to="/dashboard/upload">
             <Button variant="hero" size="sm" className="gap-2">
               <Upload className="h-3.5 w-3.5" />
-              Upload File
+              Upload First File
             </Button>
           </Link>
         </div>
       ) : filtered.length === 0 ? (
         <div className="glass-card p-12 text-center rounded-xl">
           <p className="text-muted-foreground text-sm">
-            No files match "{search}".
+            No assets match "{search}".
           </p>
         </div>
       ) : (
@@ -162,65 +171,50 @@ export default function FilesPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border/30 text-muted-foreground">
-                  <th className="text-left px-5 py-3 font-medium">File Name</th>
-                  <th className="text-left px-5 py-3 font-medium hidden sm:table-cell">
-                    Size
+                  <th className="text-left px-5 py-3 font-medium uppercase text-[10px]">Asset Name</th>
+                  <th className="text-left px-5 py-3 font-medium hidden sm:table-cell uppercase text-[10px]">
+                    Capacity
                   </th>
-                  <th className="text-left px-5 py-3 font-medium hidden md:table-cell">
-                    Upload Date
+                  <th className="text-left px-5 py-3 font-medium hidden md:table-cell uppercase text-[10px]">
+                    Created At
                   </th>
-                  <th className="text-left px-5 py-3 font-medium">Status</th>
-                  <th className="text-right px-5 py-3 font-medium">Actions</th>
+                  <th className="text-left px-5 py-3 font-medium uppercase text-[10px]">Status</th>
+                  <th className="text-right px-5 py-3 font-medium uppercase text-[10px]">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((b, idx) => {
-                  const expired = Date.now() * 1000 > b.expirationMicros;
                   return (
                     <tr
-                      key={`${b.blobName}-${b.uploadedAt}`}
+                      key={b.blob_name}
                       className="border-b border-border/20 hover:bg-muted/20 transition-colors"
                     >
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-primary shrink-0" />
-                          <span className="font-medium text-foreground truncate max-w-[150px]" title={b.blobName}>
-                            {b.blobName}
+                          <div className="h-8 w-8 rounded bg-primary/10 flex items-center justify-center">
+                            <FileText className="h-4 w-4 text-primary shrink-0" />
+                          </div>
+                          <span className="font-medium text-foreground truncate max-w-[200px]" title={b.blob_name}>
+                            {b.blob_name.split('/').pop()}
                           </span>
                         </div>
                       </td>
                       <td className="px-5 py-3.5 text-muted-foreground hidden sm:table-cell">
-                        {formatBytes(b.sizeBytes)}
+                        {formatBytes(b.size)}
                       </td>
                       <td className="px-5 py-3.5 text-muted-foreground hidden md:table-cell">
-                        {formatDate(b.uploadedAt)}
+                        {fromShelbyTimestamp(b.created_at).toLocaleDateString()}
                       </td>
                       <td className="px-5 py-3.5">
-                        <div className="flex flex-wrap gap-1.5 item-center">
-                          <span
-                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-                              expired
-                                ? "bg-muted text-muted-foreground"
-                                : "bg-accent/10 text-accent"
-                            }`}
-                          >
-                            {!expired && (
-                              <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-                            )}
-                            {expired ? "Expired" : "Permanent"}
-                          </span>
-                          {b.sharedWith && b.sharedWith.length > 0 && (
-                            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-primary/10 text-primary">
-                              <Share2 className="h-3 w-3" />
-                              Shared
-                            </span>
-                          )}
-                        </div>
+                        <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-accent/10 text-accent">
+                          <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+                          Permanent
+                        </span>
                       </td>
                       <td className="px-5 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <a
-                            href={`https://explorer.shelby.xyz/testnet/blob/${b.blobName}`}
+                            href={`https://explorer.shelby.xyz/testnet/blob/${b.blob_name}`}
                             target="_blank"
                             rel="noopener noreferrer"
                           >
@@ -231,20 +225,6 @@ export default function FilesPage() {
                               title="View on Shelby Explorer"
                             >
                               <Compass className="h-3.5 w-3.5" />
-                            </Button>
-                          </a>
-                          <a
-                            href={`https://explorer.aptoslabs.com/account/${b.ownerAddress}?network=testnet`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              title="View on Aptos Explorer"
-                            >
-                              <ExternalLink className="h-3.5 w-3.5" />
                             </Button>
                           </a>
                           <Button
@@ -269,16 +249,16 @@ export default function FilesPage() {
               </tbody>
             </table>
           </div>
-          <div className="px-5 py-3 border-t border-border/30 text-xs text-muted-foreground">
-            {filtered.length} file{filtered.length !== 1 ? "s" : ""} •{" "}
+          <div className="px-5 py-3 border-t border-border/30 text-xs text-muted-foreground flex justify-between items-center">
+            <span>{filtered.length} Asset{filtered.length !== 1 ? "s" : ""} Found</span>
             <a
-              href="https://explorer.shelby.xyz/testnet"
+              href={`https://explorer.shelby.xyz/testnet/account/${account?.address}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="hover:text-foreground inline-flex items-center gap-0.5"
+              className="hover:text-foreground inline-flex items-center gap-1 font-bold text-primary transition-all"
             >
-              View on Shelby Explorer
-              <ExternalLink className="h-3 w-3 ml-0.5" />
+              Verify on Shelby Indexer
+              <ExternalLink className="h-3 w-3" />
             </a>
           </div>
         </div>
