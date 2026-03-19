@@ -20,7 +20,7 @@ export interface ShelbyBlob {
 export async function fetchAccountBlobs(owner: string, apiKey?: string): Promise<ShelbyBlob[]> {
   const query = `
     query GetUserBlobs($owner: String!) {
-      blobs(where: { owner: { _eq: $owner }, is_deleted: { _neq: true } }, order_by: { created_at: desc }) {
+      blobs(where: { owner: { _eq: $owner }, is_deleted: { _eq: "0" } }, order_by: { created_at: desc }) {
         blob_name
         size
         created_at
@@ -74,7 +74,7 @@ export async function fetchAccountBlobs(owner: string, apiKey?: string): Promise
 export async function fetchSharedBlobs(sharee: string, apiKey?: string): Promise<ShelbyBlob[]> {
   const query = `
     query GetSharedBlobs($sharee: String!) {
-      blobs(where: { permissions: { sharee: { _eq: $sharee } }, is_deleted: { _neq: true } }, order_by: { created_at: desc }) {
+      blobs(where: { permissions: { sharee: { _eq: $sharee } }, is_deleted: { _eq: "0" } }, order_by: { created_at: desc }) {
         blob_name
         size
         created_at
