@@ -35,7 +35,7 @@ export async function fetchAccountBlobs(owner: string, apiKey?: string): Promise
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey || "AG-7FPFEZSPINUP4F7HKVSIO1ZPOEDZ8E5WN"}`
+        "Authorization": `Bearer ${apiKey || import.meta.env.VITE_SHELBY_API_KEY || ""}`
       },
       body: JSON.stringify({
         query,
@@ -82,7 +82,7 @@ export async function fetchSharedBlobs(sharee: string, apiKey?: string): Promise
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey || "AG-7FPFEZSPINUP4F7HKVSIO1ZPOEDZ8E5WN"}`
+        "Authorization": `Bearer ${apiKey || import.meta.env.VITE_SHELBY_API_KEY || ""}`
       },
       body: JSON.stringify({
         query,
@@ -125,7 +125,7 @@ function normalizeAptosAddress(addr: string): string {
  * Fetches raw blob data from the Shelby network for decryption.
  */
 export async function fetchBlobData(blobName: string, owner: string): Promise<Blob> {
-  const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || "AG-7FPFEZSPINUP4F7HKVSIO1ZPOEDZ8E5WN";
+  const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY || "";
   
   // The indexer returns blob_name as "@address/suffix". 
   // We need to extract only the suffix for the Gateway URL.

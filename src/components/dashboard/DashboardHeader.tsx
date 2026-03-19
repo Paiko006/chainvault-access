@@ -1,15 +1,3 @@
-import { Bell, ChevronDown, CheckCircle2, Shield, Zap } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { WalletButton } from "@/components/wallet/WalletButton";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
 import { Bell, ChevronDown, CheckCircle2, Shield, Zap, Info, AlertCircle, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { WalletButton } from "@/components/wallet/WalletButton";
