@@ -130,52 +130,57 @@ export default function UploadPage() {
       setIsEncrypting(false);
       setIsUploading(true);
 
-      // 1. Batch Register on Aptos
-      setUploadProgress(`Registering ${files.length} files in 1 transaction...`);
-      const pendingTx = await signAndSubmitTransaction({
-        data: ShelbyBlobClient.createBatchRegisterBlobsPayload({
-          account: AccountAddress.from(account.address.toString()),
-          expirationMicros,
-          blobs: preparedBlobs.map(b => ({
-            blobName: b.safeName,
-            blobSize: b.data.length,
-            blobMerkleRoot: b.commitments.blob_merkle_root,
-            numChunksets: b.numChunksets
-          })),
-          encoding: provider.config.enumIndex
-        }),
-        options: { maxGasAmount: 300000 }
-      });
+        // 1. Batch Register on Aptos
+        console.log("[ChainVault] Registering blobs on blockchain:", preparedBlobs.map(b => b.safeName));
+        const pendingTx = await signAndSubmitTransaction({
+          data: ShelbyBlobClient.createBatchRegisterBlobsPayload({
+            account: AccountAddress.from(account.address.toString()),
+            expirationMicros,
+            blobs: preparedBlobs.map(b => ({
+              blobName: b.safeName,
+              blobSize: b.data.length,
+              blobMerkleRoot: b.commitments.blob_merkle_root,
+              numChunksets: b.numChunksets
+            })),
+            encoding: provider.config.enumIndex
+          }),
+          options: { maxGasAmount: 300000 }
+        });
 
-      setUploadProgress("Waiting for blockchain confirmation...");
-      await shelbyClient.coordination.aptos.waitForTransaction({
-        transactionHash: pendingTx.hash,
-      });
+        console.log("[ChainVault] Registration TX submitted:", pendingTx.hash);
+        setUploadProgress("Waiting for blockchain confirmation...");
+        await shelbyClient.coordination.aptos.waitForTransaction({
+          transactionHash: pendingTx.hash,
+        });
+        console.log("[ChainVault] Registration confirmed.");
 
-      setUploadProgress("Syncing with network (5s delay)...");
-      await new Promise(r => setTimeout(r, 5000));
+        setUploadProgress("Syncing with network (5s delay)...");
+        await new Promise(r => setTimeout(r, 5000));
 
-      // 2. Upload each file to RPC
-      for (let idx = 0; idx < preparedBlobs.length; idx++) {
-        const b = preparedBlobs[idx];
-        setUploadProgress(`Uploading (${idx + 1}/${preparedBlobs.length}): ${b.safeName}...`);
+        // 2. Upload each file to RPC
+        for (let idx = 0; idx < preparedBlobs.length; idx++) {
+          const b = preparedBlobs[idx];
+          console.log(`[ChainVault] Uploading payload to RPC for: ${b.safeName}`);
+          setUploadProgress(`Uploading (${idx + 1}/${preparedBlobs.length}): ${b.safeName}...`);
 
-        const uploadWithRetry = async (attempts = 3) => {
-          for (let i = 0; i < attempts; i++) {
-            try {
-              await shelbyClient.rpc.putBlob({
-                account: account.address.toString(),
-                blobName: b.safeName,
-                blobData: b.data,
-              });
-              return;
-            } catch (err: any) {
-              if (i === attempts - 1) throw err;
-              await new Promise(r => setTimeout(r, 3000 * (i + 1)));
+          const uploadWithRetry = async (attempts = 3) => {
+            for (let i = 0; i < attempts; i++) {
+              try {
+                const res = await shelbyClient.rpc.putBlob({
+                  account: account.address.toString(),
+                  blobName: b.safeName,
+                  blobData: b.data,
+                });
+                console.log(`[ChainVault] RPC PUT success for ${b.safeName}:`, res);
+                return;
+              } catch (err: any) {
+                console.warn(`[ChainVault] RPC PUT attempt ${i + 1} failed for ${b.safeName}:`, err);
+                if (i === attempts - 1) throw err;
+                await new Promise(r => setTimeout(r, 3000 * (i + 1)));
+              }
             }
-          }
-        };
-        await uploadWithRetry();
+          };
+          await uploadWithRetry();
 
         // Save progress to local storage
         const sharedWith = wallets.filter(w => w.trim() !== "");
