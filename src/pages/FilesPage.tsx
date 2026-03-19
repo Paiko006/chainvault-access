@@ -68,18 +68,17 @@ export default function FilesPage() {
   const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY;
 
   useEffect(() => {
-    if (!connected || !account || !apiKey) return;
+    if (!connected || !account) return;
     
     const loadFiles = async () => {
       setLoading(true);
       try {
         const addr = account.address.toString();
-        // Fetch User's Blobs
-        const userBlobs = await fetchAccountBlobs(addr);
+        // Pass the explicit apiKey so the indexer knows which key to use
+        const userBlobs = await fetchAccountBlobs(addr, apiKey);
         setBlobs(userBlobs);
 
-        // Fetch Shared Blobs (Mocking cross-check with indexer structure)
-        const shared = await fetchSharedBlobs(addr);
+        const shared = await fetchSharedBlobs(addr, apiKey);
         setSharedBlobs(shared);
       } catch (err) {
         console.error("[ChainVault] Error fetching files:", err);

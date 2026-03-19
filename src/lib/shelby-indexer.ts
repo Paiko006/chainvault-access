@@ -19,7 +19,7 @@ export interface ShelbyBlob {
 export async function fetchAccountBlobs(owner: string, apiKey?: string): Promise<ShelbyBlob[]> {
   const query = `
     query GetUserBlobs($owner: String!) {
-      blobs(where: { owner: { _eq: $owner }, is_deleted: { _eq: 0 } }, order_by: { created_at: desc }) {
+      blobs(where: { owner: { _eq: $owner }, is_deleted: { _eq: false } }, order_by: { created_at: desc }) {
         blob_name
         size
         created_at
@@ -31,11 +31,15 @@ export async function fetchAccountBlobs(owner: string, apiKey?: string): Promise
 
   try {
     const normalizedOwner = normalizeAptosAddress(owner);
+    const effectiveApiKey = apiKey || localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY || "";
+    
+    console.info("[Shelby] Fetching blobs for:", normalizedOwner);
+    
     const response = await fetch(SHELBY_INDEXER_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey || import.meta.env.VITE_SHELBY_API_KEY || ""}`
+        ...(effectiveApiKey ? { "Authorization": `Bearer ${effectiveApiKey}` } : {})
       },
       body: JSON.stringify({
         query,
@@ -66,7 +70,7 @@ export async function fetchAccountBlobs(owner: string, apiKey?: string): Promise
 export async function fetchSharedBlobs(sharee: string, apiKey?: string): Promise<ShelbyBlob[]> {
   const query = `
     query GetSharedBlobs($sharee: String!) {
-      blobs(where: { permissions: { sharee: { _eq: $sharee } }, is_deleted: { _eq: 0 } }, order_by: { created_at: desc }) {
+      blobs(where: { permissions: { sharee: { _eq: $sharee } }, is_deleted: { _eq: false } }, order_by: { created_at: desc }) {
         blob_name
         size
         created_at
@@ -78,11 +82,13 @@ export async function fetchSharedBlobs(sharee: string, apiKey?: string): Promise
 
   try {
     const normalizedSharee = normalizeAptosAddress(sharee);
+    const effectiveApiKey = apiKey || localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY || "";
+    
     const response = await fetch(SHELBY_INDEXER_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey || import.meta.env.VITE_SHELBY_API_KEY || ""}`
+        ...(effectiveApiKey ? { "Authorization": `Bearer ${effectiveApiKey}` } : {})
       },
       body: JSON.stringify({
         query,
