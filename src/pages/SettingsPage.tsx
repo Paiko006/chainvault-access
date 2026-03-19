@@ -56,8 +56,8 @@ export default function SettingsPage() {
                 </Button>
               </div>
               <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                <Info className="h-3 w-3" />
-                This key is used to authenticate with Shelby Protocol via Geomi. Stored securely in your browser.
+                <Info className="h-3 w-3 shrink-0" />
+                Optional: The app works automatically using our public key. Enter your own key only if you need higher rate limits or dedicated priority access.
               </p>
             </div>
           </div>

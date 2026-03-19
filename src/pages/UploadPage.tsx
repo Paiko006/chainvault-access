@@ -27,6 +27,7 @@ function saveToLocalStorage(blob: StoredBlob) {
 }
 
 import { getVaultKey, encryptData, ENCRYPTION_PREFIX } from "@/lib/crypto";
+import { PUBLIC_SHELBY_API_KEY } from "@/lib/shelby-indexer";
 
 export default function UploadPage() {
   const [files, setFiles] = useState<File[]>([]);
@@ -80,9 +81,9 @@ export default function UploadPage() {
       return;
     }
 
-    const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY;
+    const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY || PUBLIC_SHELBY_API_KEY;
     if (!apiKey) {
-      toast.error("API Key missing.");
+      toast.error("Internal Error: Missing public API Key fallback.");
       return;
     }
 

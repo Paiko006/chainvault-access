@@ -22,9 +22,12 @@ import { ShelbyClient } from "@shelby-protocol/sdk/browser";
 import { ShelbyClientProvider } from "@shelby-protocol/react";
 
 const App = () => {
-  // Priority: localStorage (from Settings UI) > environment variables
-  const shelbyApiKey = (localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY)?.trim();
-  const aptosApiKey = import.meta.env.VITE_APTOS_API_KEY?.trim();
+  // Priority: localStorage (from Settings UI) > environment variables > Public Default Key
+  const PUBLIC_DEFAULT_SHELBY_KEY = "AG-7FPFEZSPINUP4F7HKVSIO1ZPOEDZ8E5WN";
+  const PUBLIC_DEFAULT_APTOS_KEY = "aptoslabs_KddnsDJRqar_7N4ja9CNYNhQJwcGnwbqgDxdY6sGr4qPE";
+
+  const shelbyApiKey = (localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY || PUBLIC_DEFAULT_SHELBY_KEY)?.trim();
+  const aptosApiKey = (import.meta.env.VITE_APTOS_API_KEY || PUBLIC_DEFAULT_APTOS_KEY)?.trim();
 
   useEffect(() => {
     // Security & Anti-Copy logic removed as requested.

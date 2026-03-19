@@ -4,6 +4,7 @@
  */
 
 const SHELBY_INDEXER_URL = "https://api.testnet.aptoslabs.com/nocode/v1/public/alias/shelby/testnet/v1/graphql";
+export const PUBLIC_SHELBY_API_KEY = "AG-7FPFEZSPINUP4F7HKVSIO1ZPOEDZ8E5WN";
 
 export interface ShelbyBlob {
   blob_name: string;
@@ -31,7 +32,7 @@ export async function fetchAccountBlobs(owner: string, apiKey?: string): Promise
 
   try {
     const normalizedOwner = normalizeAptosAddress(owner);
-    const effectiveApiKey = apiKey || localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY || "";
+    const effectiveApiKey = apiKey || localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY || PUBLIC_SHELBY_API_KEY;
     
     console.info("[Shelby] Fetching blobs for:", normalizedOwner);
     
@@ -82,7 +83,7 @@ export async function fetchSharedBlobs(sharee: string, apiKey?: string): Promise
 
   try {
     const normalizedSharee = normalizeAptosAddress(sharee);
-    const effectiveApiKey = apiKey || localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY || "";
+    const effectiveApiKey = apiKey || localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY || PUBLIC_SHELBY_API_KEY;
     
     const response = await fetch(SHELBY_INDEXER_URL, {
       method: "POST",
@@ -131,7 +132,7 @@ function normalizeAptosAddress(addr: string): string {
  * Fetches raw blob data from the Shelby network for decryption.
  */
 export async function fetchBlobData(blobName: string, owner: string): Promise<Blob> {
-  const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY || "";
+  const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY || PUBLIC_SHELBY_API_KEY;
   
   // The indexer returns blob_name as "@address/suffix". 
   // We need to extract only the suffix for the Gateway URL.
