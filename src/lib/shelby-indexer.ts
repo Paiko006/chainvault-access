@@ -20,7 +20,7 @@ export interface ShelbyBlob {
 export async function fetchAccountBlobs(owner: string, apiKey?: string): Promise<ShelbyBlob[]> {
   const query = `
     query GetUserBlobs($owner: String!) {
-      blobs(where: { owner: { _eq: $owner }, is_deleted: { _eq: false } }, order_by: { created_at: desc }) {
+      blobs(where: { owner: { _eq: $owner }, is_deleted: { _neq: true } }, order_by: { created_at: desc }) {
         blob_name
         size
         created_at
@@ -40,7 +40,10 @@ export async function fetchAccountBlobs(owner: string, apiKey?: string): Promise
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(effectiveApiKey ? { "Authorization": `Bearer ${effectiveApiKey}` } : {})
+        ...(effectiveApiKey ? { 
+          "Authorization": `Bearer ${effectiveApiKey}`,
+          "x-api-key": effectiveApiKey 
+        } : {})
       },
       body: JSON.stringify({
         query,
@@ -71,7 +74,7 @@ export async function fetchAccountBlobs(owner: string, apiKey?: string): Promise
 export async function fetchSharedBlobs(sharee: string, apiKey?: string): Promise<ShelbyBlob[]> {
   const query = `
     query GetSharedBlobs($sharee: String!) {
-      blobs(where: { permissions: { sharee: { _eq: $sharee } }, is_deleted: { _eq: false } }, order_by: { created_at: desc }) {
+      blobs(where: { permissions: { sharee: { _eq: $sharee } }, is_deleted: { _neq: true } }, order_by: { created_at: desc }) {
         blob_name
         size
         created_at
@@ -89,7 +92,10 @@ export async function fetchSharedBlobs(sharee: string, apiKey?: string): Promise
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(effectiveApiKey ? { "Authorization": `Bearer ${effectiveApiKey}` } : {})
+        ...(effectiveApiKey ? { 
+          "Authorization": `Bearer ${effectiveApiKey}`,
+          "x-api-key": effectiveApiKey 
+        } : {})
       },
       body: JSON.stringify({
         query,
@@ -121,11 +127,13 @@ export async function fetchSharedBlobs(sharee: string, apiKey?: string): Promise
  */
 function normalizeAptosAddress(addr: string): string {
   let clean = addr.toLowerCase();
-  if (clean.startsWith("0x")) {
-    clean = clean.slice(2);
+  if (!clean.startsWith("0x")) {
+    clean = "0x" + clean;
   }
-  // Pad to 64 characters with leading zeros
-  return "0x" + clean.padStart(64, "0");
+  // For Shelby/Geomi Indexer, we should use the standard 64-char hex string (padded)
+  const parts = clean.split("0x");
+  const hex = parts[1] || parts[0];
+  return "0x" + hex.padStart(64, "0");
 }
 
 /**
@@ -159,7 +167,8 @@ export async function fetchBlobData(blobName: string, owner: string): Promise<Bl
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const response = await fetch(url, {
       headers: {
-        "Authorization": `Bearer ${apiKey}`
+        "Authorization": `Bearer ${apiKey}`,
+        "x-api-key": apiKey
       }
     });
     if (response.ok) {
