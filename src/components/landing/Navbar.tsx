@@ -16,8 +16,8 @@ const links = [
 export function Navbar() {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/30 bg-background/80 backdrop-blur-xl">
-      <div className="container max-w-7xl mx-auto flex items-center justify-between h-16 px-6">
-        <div className="flex items-center gap-4">
+      <div className="container max-w-7xl mx-auto flex items-center justify-between h-16 px-4 md:px-8">
+        <div className="flex items-center gap-2 md:gap-4">
           <Sheet>
             <SheetTrigger asChild>
               <button className="md:hidden p-2 -ml-2 hover:bg-white/5 rounded-lg transition-colors">
@@ -59,7 +59,7 @@ export function Navbar() {
 
           <Link to="/" className="flex items-center gap-2 group">
             <img src="/logo.png" alt="Logo" className="h-9 w-9 object-contain group-hover:scale-110 transition-transform" />
-            <span className="font-display font-bold text-lg">ShelbySecure</span>
+            <span className="font-display font-bold text-lg hidden sm:inline">ShelbySecure</span>
           </Link>
         </div>
 
