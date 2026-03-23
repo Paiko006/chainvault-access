@@ -21,7 +21,7 @@ export function HeroSection() {
   };
 
   return (
-    <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden bg-black">
+    <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden bg-transparent">
       <div className="hero-glow absolute inset-0 pointer-events-none" />
       <div className="absolute inset-0 pointer-events-none">
         <LightPillar 

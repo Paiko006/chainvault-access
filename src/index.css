@@ -93,7 +93,7 @@
 
   .glass-card {
     @apply rounded-xl border border-border/50;
-    background: hsl(var(--surface-glass) / 0.6);
+    background: hsl(var(--surface-glass) / 0.3);
     backdrop-filter: blur(12px);
   }
 
