@@ -34,6 +34,7 @@ import {
   fetchBlobData,
   fetchSharedBlobs 
 } from "@/lib/shelby-indexer";
+import { shortenAddress } from "@/lib/wallet";
 import { getVaultKey, decryptData, ENCRYPTION_PREFIX } from "@/lib/crypto";
 import { useNotifications } from "@/hooks/use-notifications";
 import { 
@@ -259,7 +260,7 @@ export default function FilesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold mb-1">My Files</h1>
           <p className="text-muted-foreground text-sm">
@@ -267,23 +268,41 @@ export default function FilesPage() {
             <span className="font-medium text-primary">Shelby testnet</span>.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-           <Button 
-             variant="outline" 
-             size="sm" 
-             onClick={() => setRefresh(r => r + 1)}
-             disabled={loading}
-             className="gap-2"
-           >
-             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-             Sync
-           </Button>
-           <Link to="/dashboard/upload">
-             <Button variant="hero" size="sm" className="gap-2">
-               <Upload className="h-3.5 w-3.5" />
-               Upload File
-             </Button>
-           </Link>
+        <div className="flex flex-col items-end gap-3">
+           <div className="flex items-center gap-2">
+             {account && (
+               <a
+                 href={`https://explorer.shelby.xyz/testnet/account/${account.address}`}
+                 target="_blank"
+                 rel="noopener noreferrer"
+                 className="inline-flex items-center gap-1.5 text-[11px] font-mono text-primary hover:underline font-bold"
+               >
+                 View Profile on Explorer
+                 <ExternalLink className="h-3.5 w-3.5" />
+               </a>
+             )}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setRefresh(r => r + 1)}
+                disabled={loading}
+                className="gap-2 h-8 rounded-lg"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+                Sync
+              </Button>
+              <Link to="/dashboard/upload">
+                <Button variant="hero" size="sm" className="gap-2 h-8 rounded-lg px-4">
+                  <Upload className="h-3.5 w-3.5" />
+                  Upload
+                </Button>
+              </Link>
+           </div>
+           {account && (
+             <div className="text-[10px] text-muted-foreground font-mono bg-secondary/50 px-2 py-0.5 rounded border border-border/50">
+               {shortenAddress(account.address.toString())}
+             </div>
+           )}
         </div>
       </div>
 
@@ -541,9 +560,9 @@ const FileTable = ({
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       )}
-                      <a href={`https://explorer.shelby.xyz/testnet/blobs/${b.owner}?blobName=${encodeURIComponent(cleanName)}`} target="_blank" rel="noopener noreferrer">
+                      <a href={`https://explorer.shelby.xyz/testnet/blobs/${b.owner}?blobName=${encodeURIComponent(rawName)}`} target="_blank" rel="noopener noreferrer">
                         <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:bg-muted rounded-xl transition-all">
-                          <Compass className="h-4 w-4" />
+                          <ExternalLink className="h-4 w-4" />
                         </Button>
                       </a>
                     </div>
