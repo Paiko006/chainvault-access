@@ -127,14 +127,24 @@ export function PricingSection() {
 
       // Step B: Smart Contract Upgrade (Atomic Payment & Registration)
       // This calls a dedicated contract function that handles SUSD payment and records the upgrade
-      const upgradeTx = await signAndSubmitTransaction({
-        data: {
-          function: `${PRICING_CONTRACT}::buy_capacity`,
-          typeArguments: [],
-          functionArguments: [bytesLimit] 
+      try {
+        const upgradeTx = await signAndSubmitTransaction({
+          data: {
+            function: `${PRICING_CONTRACT}::buy_capacity`,
+            typeArguments: [],
+            functionArguments: [bytesLimit] 
+          }
+        });
+        await shelbyClient.coordination.aptos.waitForTransaction({ transactionHash: upgradeTx.hash });
+      } catch (err: any) {
+        console.warn("[Pricing] Contract call failed, falling back to simulation:", err);
+        if (err.message?.includes("module_not_found") || err.message?.includes("Module not found")) {
+          toast.info("Smart Contract belum ter-deploy. Menjalankan mode simulasi untuk demo...", { id: tid });
+          // In demo mode, we continue to Step C even if the contract call fails
+        } else {
+          throw err; // Rethrow other errors (e.g., user rejected)
         }
-      });
-      await shelbyClient.coordination.aptos.waitForTransaction({ transactionHash: upgradeTx.hash });
+      }
 
       // Step C: Register Metadata on Shelby Network (Provisioning)
       const tx = await signAndSubmitTransaction({
