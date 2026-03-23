@@ -17,8 +17,8 @@ import { syncUserQuota } from "@/lib/shelby-indexer";
 export const QUOTA_STORAGE_KEY = "chainvault_quota";
 export const QUOTA_BLOB_PREFIX = ".quota_";
 export const DEFAULT_QUOTA = 5 * 1024 * 1024 * 1024; // 5 GB
-export const PRICING_CONTRACT = "0x58022a868425261d7667a731d7986708f36c56782d49e15ad21c568778a48ef2::vault_pricing";
-export const SUSD_TOKEN_ADDRESS = "0x58022a868425261d7667a731d7986708f36c56782d49e15ad21c568778a48ef2::shelby_usd::SUSD";
+export const SUSD_TOKEN_ADDRESS = "0x58022a868425261d7667a731d7986708f36c56782d49e15ad21c568778a48ef2::shelby_usd::SUSD"; // Mock ShelbyUSD
+export const RECIPIENT_ADDRESS = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"; // Mock Treasury
 
 const plans = [
   {
@@ -125,26 +125,15 @@ export function PricingSection() {
       const chunksetSize = provider.config.erasure_k * provider.config.chunkSizeBytes;
       const numChunksets = expectedTotalChunksets(quotaData.length, chunksetSize);
 
-      // Step B: Smart Contract Upgrade (Atomic Payment & Registration)
-      // This calls a dedicated contract function that handles SUSD payment and records the upgrade
-      try {
-        const upgradeTx = await signAndSubmitTransaction({
-          data: {
-            function: `${PRICING_CONTRACT}::buy_capacity`,
-            typeArguments: [],
-            functionArguments: [bytesLimit] 
-          }
-        });
-        await shelbyClient.coordination.aptos.waitForTransaction({ transactionHash: upgradeTx.hash });
-      } catch (err: any) {
-        console.warn("[Pricing] Contract call failed, falling back to simulation:", err);
-        if (err.message?.includes("module_not_found") || err.message?.includes("Module not found")) {
-          toast.info("Smart Contract belum ter-deploy. Menjalankan mode simulasi untuk demo...", { id: tid });
-          // In demo mode, we continue to Step C even if the contract call fails
-        } else {
-          throw err; // Rethrow other errors (e.g., user rejected)
+      // Step B: Pay for the plan (ShelbyUSD Transfer)
+      const payTx = await signAndSubmitTransaction({
+        data: {
+          function: "0x1::primary_fungible_store::transfer",
+          typeArguments: [SUSD_TOKEN_ADDRESS],
+          functionArguments: [RECIPIENT_ADDRESS, parseInt(plan.price) * 100_000_000] // Assuming 8 decimals
         }
-      }
+      });
+      await shelbyClient.coordination.aptos.waitForTransaction({ transactionHash: payTx.hash });
 
       // Step C: Register Metadata on Shelby Network (Provisioning)
       const tx = await signAndSubmitTransaction({
