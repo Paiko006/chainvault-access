@@ -194,15 +194,28 @@ export async function fetchBlobData(blobName: string, owner: string): Promise<Bl
 
 /**
  * Fetches the user's storage quota from the Shelby network (cross-device sync).
+ * It looks for any blobs starting with ".quota_" and picks the one with the largest value.
  */
-export async function syncUserQuota(owner: string, blobName: string): Promise<number | null> {
+export async function syncUserQuota(owner: string, apiKey?: string): Promise<number | null> {
   try {
-    const blob = await fetchBlobData(blobName, owner);
-    const text = await blob.text();
-    const quota = parseInt(text);
-    return isNaN(quota) ? null : quota;
+    // 1. Fetch all blobs to find matching quota markers
+    const blobs = await fetchAccountBlobs(owner, apiKey);
+    const quotaBlobs = blobs.filter(b => b.blob_name.includes('.quota_'));
+    
+    if (quotaBlobs.length === 0) return null;
+
+    // 2. Extract values from names (e.g., ".quota_53687091200")
+    const values = quotaBlobs.map(b => {
+      const parts = b.blob_name.split('.quota_');
+      const val = parseInt(parts[parts.length - 1]);
+      return isNaN(val) ? 0 : val;
+    });
+
+    // 3. Return the maximum value (highest upgrade)
+    const maxQuota = Math.max(...values);
+    return maxQuota > 0 ? maxQuota : null;
   } catch (err) {
-    // If blob doesn't exist or error, return null
+    console.error("[ShelbyIndexer] Sync quota error:", err);
     return null;
   }
 }

@@ -28,7 +28,7 @@ function saveToLocalStorage(blob: StoredBlob) {
 
 import { getVaultKey, encryptData, ENCRYPTION_PREFIX } from "@/lib/crypto";
 import { PUBLIC_SHELBY_API_KEY, fetchAccountBlobs, formatBytes, syncUserQuota } from "@/lib/shelby-indexer";
-import { QUOTA_STORAGE_KEY, DEFAULT_QUOTA, QUOTA_BLOB_NAME } from "@/components/landing/PricingSection";
+import { QUOTA_STORAGE_KEY, DEFAULT_QUOTA } from "@/components/landing/PricingSection";
 
 export default function UploadPage() {
   const [files, setFiles] = useState<File[]>([]);
@@ -60,7 +60,7 @@ export default function UploadPage() {
           const addr = account.address.toString();
           
           // 1. Cross-Device Sync: Check network for updated quota
-          const networkQuota = await syncUserQuota(addr, QUOTA_BLOB_NAME);
+          const networkQuota = await syncUserQuota(addr);
           if (networkQuota) {
             setQuota(networkQuota);
             localStorage.setItem(QUOTA_STORAGE_KEY, networkQuota.toString());

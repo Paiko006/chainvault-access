@@ -13,7 +13,7 @@ import {
 import { AccountAddress } from "@aptos-labs/ts-sdk";
 
 export const QUOTA_STORAGE_KEY = "chainvault_quota";
-export const QUOTA_BLOB_NAME = ".quota";
+export const QUOTA_BLOB_PREFIX = ".quota_";
 export const DEFAULT_QUOTA = 5 * 1024 * 1024 * 1024; // 5 GB
 
 const plans = [
@@ -34,7 +34,7 @@ const plans = [
   },
   {
     name: "Pro Vault",
-    price: "1",
+    price: "10",
     storage: "50 GB",
     description: "For power users storing media and larger encrypted archives.",
     features: [
@@ -51,7 +51,7 @@ const plans = [
   },
   {
     name: "Enterprise",
-    price: "5",
+    price: "50",
     storage: "500 GB",
     description: "Maximum security and capacity for teams and organizations.",
     features: [
@@ -84,12 +84,13 @@ export function PricingSection() {
     }
 
     // 1. Simulate payment/Sync with Shelby Network
-    const tid = toast.loading(`Memproses pembayaran ${plan.price} $APT dan merelasikan ke jaringan Shelby...`);
+    const tid = toast.loading(`Memproses pembayaran ${plan.price} ShelbyUSD dan merelasikan ke jaringan Shelby...`);
     
     try {
       // Calculate bytes
       const gb = parseInt(plan.storage);
       const bytesLimit = gb * 1024 * 1024 * 1024;
+      const uniqueBlobName = `${QUOTA_BLOB_PREFIX}${bytesLimit}`;
       
       // Step A: Prepare a small metadata blob with the quota value
       const quotaData = new TextEncoder().encode(bytesLimit.toString());
@@ -102,7 +103,7 @@ export function PricingSection() {
       const tx = await signAndSubmitTransaction({
         data: ShelbyBlobClient.createRegisterBlobPayload({
           account: AccountAddress.from(account.address.toString()),
-          blobName: QUOTA_BLOB_NAME,
+          blobName: uniqueBlobName,
           blobSize: quotaData.length,
           blobMerkleRoot: commitments.blob_merkle_root,
           numChunksets,
@@ -116,7 +117,7 @@ export function PricingSection() {
       // Step C: Upload real data
       await shelbyClient.rpc.putBlob({
         account: account.address.toString(),
-        blobName: QUOTA_BLOB_NAME,
+        blobName: uniqueBlobName,
         blobData: quotaData
       });
 
@@ -143,7 +144,7 @@ export function PricingSection() {
             Penyimpanan Aman, <span className="gradient-text">Harga Transparan</span>
           </h3>
           <p className="text-muted-foreground text-lg">
-            Upgrade kapasitas vault Anda secara permanen di jaringan Shelby menggunakan token $APT.
+            Upgrade kapasitas vault Anda secara permanen di jaringan Shelby menggunakan ShelbyUSD.
           </p>
         </div>
 
@@ -172,7 +173,7 @@ export function PricingSection() {
               <div className="mb-8">
                 <div className="flex items-baseline gap-1">
                   <span className="text-4xl font-bold">{plan.price}</span>
-                  <span className="text-xl font-bold text-primary">$APT</span>
+                  <span className="text-xl font-bold text-primary">ShelbyUSD</span>
                   {plan.price !== "0" && <span className="text-muted-foreground text-sm">/ bulan</span>}
                 </div>
                 <p className="text-muted-foreground text-sm mt-3 leading-relaxed">
