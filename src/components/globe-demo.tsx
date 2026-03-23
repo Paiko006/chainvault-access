@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 import { fetchStorageProviders, StorageProvider } from "@/lib/shelby-nodes";
 
 const World = lazy(() => import("@/components/ui/globe"));
-import { Aurora } from "@/components/ui/aurora";
 
 export default function GlobeDemo() {
   const [providers, setProviders] = useState<StorageProvider[]>([]);
@@ -61,12 +60,6 @@ export default function GlobeDemo() {
 
   return (
     <div className="flex flex-col items-center justify-center py-12 md:py-24 min-h-[600px] md:h-auto bg-transparent relative w-full overflow-hidden">
-      <Aurora 
-        colorStops={['#7cff67', '#001824', '#7cff67']} 
-        amplitude={1.0}
-        intensity={0.6}
-        className="opacity-50"
-      />
       <div className="max-w-7xl mx-auto w-full relative h-[40rem] md:h-[45rem] px-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
