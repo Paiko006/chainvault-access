@@ -1,4 +1,4 @@
-import { Lock } from "lucide-react";
+// Footer component imports removed Lock
 
 const links = [
   { label: "Docs", href: "https://docs.shelby.xyz/" },
@@ -12,9 +12,7 @@ export function Footer() {
     <footer className="border-t border-border/30 py-12 px-4">
       <div className="container max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-            <Lock className="h-4 w-4 text-primary-foreground" />
-          </div>
+          <img src="/logo.png" alt="Logo" className="h-9 w-9 object-contain" />
           <span className="font-display font-bold text-lg">ShelbySecure</span>
         </div>
 

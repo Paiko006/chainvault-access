@@ -11,7 +11,6 @@ import {
   Share2,
   ShieldCheck,
   Settings,
-  Lock,
   Compass,
 } from "lucide-react";
 
@@ -73,9 +72,7 @@ export function AppSidebar() {
   return (
     <aside className="hidden lg:flex flex-col w-64 border-r border-border bg-sidebar shrink-0 h-screen sticky top-0">
       <Link to="/" className="flex items-center gap-2 px-6 h-16 border-b border-sidebar-border hover:bg-sidebar-accent/30 transition-colors">
-        <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-          <Lock className="h-4 w-4 text-primary-foreground" />
-        </div>
+        <img src="/logo.png" alt="Logo" className="h-8 w-8 object-contain" />
         <span className="font-display font-bold text-lg text-sidebar-accent-foreground">ShelbySecure</span>
       </Link>
 
