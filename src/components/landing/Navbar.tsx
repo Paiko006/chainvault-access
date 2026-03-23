@@ -11,9 +11,9 @@ export function Navbar() {
         </Link>
 
         <div className="hidden md:flex items-center gap-8">
-          <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Features</a>
+          <Link to="/features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Features</Link>
           <a href="https://docs.shelby.xyz/" target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Docs</a>
-          <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-semibold text-primary">Pricing</a>
+          <Link to="/pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-semibold text-primary">Pricing</Link>
         </div>
 
         <WalletButton />
