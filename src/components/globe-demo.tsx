@@ -60,7 +60,7 @@ export default function GlobeDemo() {
   ];
 
   return (
-    <div className="flex flex-col items-center justify-center py-12 md:py-24 min-h-[600px] md:h-auto dark:bg-black bg-white relative w-full overflow-hidden">
+    <div className="flex flex-col items-center justify-center py-12 md:py-24 min-h-[600px] md:h-auto bg-black relative w-full overflow-hidden">
       <Aurora 
         colorStops={['#7cff67', '#001824', '#7cff67']} 
         amplitude={1.0}
