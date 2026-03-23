@@ -36,7 +36,7 @@ const item = {
 
 export function FeaturesSection() {
   return (
-    <section className="py-24 px-4">
+    <section id="features" className="py-24 px-4">
       <div className="container max-w-6xl mx-auto">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
