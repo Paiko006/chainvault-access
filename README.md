@@ -1,5 +1,7 @@
 # ChainVault Access
 
+https://chainlockers.vercel.app/
+
 ChainVault Access is a decentralized data vault built on the Aptos ecosystem using the Shelby Protocol. It provides secure, wallet-based file storage with client-side encryption.
 
 ## Features
@@ -47,13 +49,6 @@ ChainVault Access is a decentralized data vault built on the Aptos ecosystem usi
 - **Styling**: Tailwind CSS, Shadcn UI
 - **Blockchain**: Aptos TS SDK, Shelby Protocol SDK
 - **Encryption**: Web Crypto API (AES-GCM)
-
-## Security Protections
-
-The application includes several layers of protection:
-- **Anti-Copy**: Right-click, text selection, and image dragging are disabled.
-- **Anti-Inspect**: Developer tool shortcuts (F12, Ctrl+Shift+I) are blocked.
-- **DevTools Detector**: Active scanning for open developer tools with automatic console clearing.
 
 ---
 © 2026 ChainVault Access. All rights reserved.
