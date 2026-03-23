@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { useState, useEffect } from "react";
 import { ConnectWalletModal } from "@/components/wallet/ConnectWalletModal";
+import { LightPillar } from "@/components/ui/light-pillar";
 
 export function HeroSection() {
   const { connected } = useWallet();
@@ -22,6 +23,18 @@ export function HeroSection() {
   return (
     <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
       <div className="hero-glow absolute inset-0 pointer-events-none" />
+      <div className="absolute inset-0 pointer-events-none">
+        <LightPillar 
+          topColor="#8B5CF6" 
+          bottomColor="#06B6D4" 
+          intensity={0.8}
+          pillarWidth={4.0}
+          pillarHeight={0.6}
+          rotationSpeed={0.2}
+          glowAmount={0.003}
+          mixBlendMode="plus-lighter"
+        />
+      </div>
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-primary/5 blur-[120px] pointer-events-none" />
 
       <div className="container relative z-10 text-center max-w-4xl mx-auto px-4 py-20">
