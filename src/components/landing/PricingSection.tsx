@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Check, Zap, Shield, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -11,10 +12,13 @@ import {
   expectedTotalChunksets 
 } from "@shelby-protocol/sdk/browser";
 import { AccountAddress } from "@aptos-labs/ts-sdk";
+import { syncUserQuota } from "@/lib/shelby-indexer";
 
 export const QUOTA_STORAGE_KEY = "chainvault_quota";
 export const QUOTA_BLOB_PREFIX = ".quota_";
 export const DEFAULT_QUOTA = 5 * 1024 * 1024 * 1024; // 5 GB
+export const PRICING_CONTRACT = "0x58022a868425261d7667a731d7986708f36c56782d49e15ad21c568778a48ef2::vault_pricing";
+export const SUSD_TOKEN_ADDRESS = "0x58022a868425261d7667a731d7986708f36c56782d49e15ad21c568778a48ef2::shelby_usd::SUSD";
 
 const plans = [
   {
@@ -71,6 +75,28 @@ export function PricingSection() {
   const navigate = useNavigate();
   const { account, connected, signAndSubmitTransaction } = useWallet();
   const shelbyClient = useShelbyClient();
+  const [currentQuota, setCurrentQuota] = useState<number>(DEFAULT_QUOTA);
+  const [loadingQuota, setLoadingQuota] = useState(false);
+
+  useEffect(() => {
+    async function fetchQuota() {
+      if (connected && account) {
+        setLoadingQuota(true);
+        try {
+          const quota = await syncUserQuota(account.address.toString());
+          if (quota) {
+            setCurrentQuota(quota);
+            localStorage.setItem(QUOTA_STORAGE_KEY, quota.toString());
+          }
+        } catch (err) {
+          console.error("[Pricing] Failed to sync quota:", err);
+        } finally {
+          setLoadingQuota(false);
+        }
+      }
+    }
+    fetchQuota();
+  }, [connected, account]);
 
   const handleUpgrade = async (plan: typeof plans[0]) => {
     if (plan.price === "0") {
@@ -99,7 +125,18 @@ export function PricingSection() {
       const chunksetSize = provider.config.erasure_k * provider.config.chunkSizeBytes;
       const numChunksets = expectedTotalChunksets(quotaData.length, chunksetSize);
 
-      // Step B: Register on-chain
+      // Step B: Smart Contract Upgrade (Atomic Payment & Registration)
+      // This calls a dedicated contract function that handles SUSD payment and records the upgrade
+      const upgradeTx = await signAndSubmitTransaction({
+        data: {
+          function: `${PRICING_CONTRACT}::buy_capacity`,
+          typeArguments: [],
+          functionArguments: [bytesLimit] 
+        }
+      });
+      await shelbyClient.coordination.aptos.waitForTransaction({ transactionHash: upgradeTx.hash });
+
+      // Step C: Register Metadata on Shelby Network (Provisioning)
       const tx = await signAndSubmitTransaction({
         data: ShelbyBlobClient.createRegisterBlobPayload({
           account: AccountAddress.from(account.address.toString()),
@@ -114,7 +151,7 @@ export function PricingSection() {
 
       await shelbyClient.coordination.aptos.waitForTransaction({ transactionHash: tx.hash });
       
-      // Step C: Upload real data
+      // Step D: Upload real data
       await shelbyClient.rpc.putBlob({
         account: account.address.toString(),
         blobName: uniqueBlobName,
@@ -149,58 +186,69 @@ export function PricingSection() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {plans.map((plan) => (
-            <div
-              key={plan.name}
-              className={`glass-card p-8 rounded-2xl flex flex-col relative transition-all duration-500 hover:glow-sm group ${plan.highlight ? 'border-primary/40 ring-1 ring-primary/20 scale-105 z-10' : 'border-border/40'}`}
-            >
-              {plan.highlight && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg shadow-primary/20">
-                  Paling Populer
-                </div>
-              )}
+          {plans.map((plan) => {
+            const planBytes = parseInt(plan.storage) * 1024 * 1024 * 1024;
+            const isActive = currentQuota === planBytes;
+            const isUpgrade = planBytes > currentQuota;
 
-              <div className="flex items-center gap-4 mb-6">
-                <div className={`h-12 w-12 rounded-xl bg-white/5 flex items-center justify-center ${plan.color}`}>
-                  <plan.icon className="h-6 w-6" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-xl">{plan.name}</h4>
-                  <div className="text-muted-foreground text-xs uppercase tracking-widest font-bold">{plan.storage}</div>
-                </div>
-              </div>
-
-              <div className="mb-8">
-                <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-bold">{plan.price}</span>
-                  <span className="text-xl font-bold text-primary">ShelbyUSD</span>
-                  {plan.price !== "0" && <span className="text-muted-foreground text-sm">/ bulan</span>}
-                </div>
-                <p className="text-muted-foreground text-sm mt-3 leading-relaxed">
-                  {plan.description}
-                </p>
-              </div>
-
-              <div className="space-y-4 mb-10 flex-1">
-                {plan.features.map((feature) => (
-                  <div key={feature} className="flex items-start gap-3">
-                    <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                      <Check className="h-3 w-3 text-primary" />
-                    </div>
-                    <span className="text-sm text-muted-foreground/90">{feature}</span>
-                  </div>
-                ))}
-              </div>
-
-              <Button
-                variant={plan.highlight ? "hero" : "outline"}
-                className={`w-full py-6 rounded-xl font-bold uppercase tracking-widest text-[11px] transition-all group-hover:scale-[1.02] ${!plan.highlight ? 'hover:bg-white/5' : ''}`}
-                onClick={() => handleUpgrade(plan)}
+            return (
+              <div
+                key={plan.name}
+                className={`glass-card p-8 rounded-2xl flex flex-col relative transition-all duration-500 hover:glow-sm group ${isActive ? 'border-accent ring-1 ring-accent/40 bg-accent/5' : plan.highlight ? 'border-primary/40 ring-1 ring-primary/20 scale-105 z-10' : 'border-border/40'}`}
               >
-                {plan.price === "0" ? "Mulai Gratis" : "Upgrade Sekarang"}
-              </Button>
-            </div>
-          ))}
+                {isActive && (
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-accent text-black text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg shadow-accent/20">
+                    Paket Aktif
+                  </div>
+                ) || plan.highlight && (
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg shadow-primary/20">
+                    Paling Populer
+                  </div>
+                )}
+
+                <div className="flex items-center gap-4 mb-6">
+                  <div className={`h-12 w-12 rounded-xl bg-white/5 flex items-center justify-center ${isActive ? 'text-accent' : plan.color}`}>
+                    <plan.icon className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-xl">{plan.name}</h4>
+                    <div className="text-muted-foreground text-xs uppercase tracking-widest font-bold">{plan.storage}</div>
+                  </div>
+                </div>
+
+                <div className="mb-8">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-4xl font-bold">{plan.price}</span>
+                    <span className="text-xl font-bold text-primary">ShelbyUSD</span>
+                    {plan.price !== "0" && <span className="text-muted-foreground text-sm">/ bulan</span>}
+                  </div>
+                  <p className="text-muted-foreground text-sm mt-3 leading-relaxed">
+                    {plan.description}
+                  </p>
+                </div>
+
+                <div className="space-y-4 mb-10 flex-1">
+                  {plan.features.map((feature) => (
+                    <div key={feature} className="flex items-start gap-3">
+                      <div className={`h-5 w-5 rounded-full ${isActive ? 'bg-accent/10' : 'bg-primary/10'} flex items-center justify-center shrink-0 mt-0.5`}>
+                        <Check className={`h-3 w-3 ${isActive ? 'text-accent' : 'text-primary'}`} />
+                      </div>
+                      <span className="text-sm text-muted-foreground/90">{feature}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <Button
+                  variant={isActive ? "outline" : plan.highlight ? "hero" : "outline"}
+                  disabled={isActive || (!isUpgrade && plan.price !== "0")}
+                  className={`w-full py-6 rounded-xl font-bold uppercase tracking-widest text-[11px] transition-all group-hover:scale-[1.02] ${!plan.highlight && !isActive ? 'hover:bg-white/5' : ''} ${isActive ? 'border-accent/40 text-accent opacity-100 cursor-default' : ''}`}
+                  onClick={() => handleUpgrade(plan)}
+                >
+                  {isActive ? "Paket Aktif" : plan.price === "0" ? "Mulai Gratis" : isUpgrade ? "Upgrade Sekarang" : "Paket Anda"}
+                </Button>
+              </div>
+            );
+          })}
         </div>
 
         <div className="mt-16 glass-card p-8 rounded-2xl border-dashed border-2 border-border/50 text-center max-w-2xl mx-auto">
