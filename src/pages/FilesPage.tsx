@@ -16,9 +16,10 @@ import {
   Key,
   Shield,
   ShieldCheck,
-  Clock,
   Database,
-  Eye
+  Eye,
+  HardDrive,
+  Clock
 } from "lucide-react";
 import { useDeleteBlobs } from "@shelby-protocol/react";
 import { toast } from "sonner";
@@ -94,6 +95,36 @@ export default function FilesPage() {
   const filtered = blobs.filter((b) =>
     b.blob_name.toLowerCase().includes(search.toLowerCase())
   );
+
+  const totalSize = blobs.reduce((s, b) => s + Number(b.size), 0);
+  const lastUpload = blobs[0] ? fromShelbyTimestamp(blobs[0].created_at).toLocaleDateString() : "—";
+  
+  const stats = [
+    {
+      label: "Total Assets",
+      value: loading ? "..." : String(blobs.length),
+      icon: FileText,
+      color: "text-primary",
+    },
+    {
+      label: "Capacity Used",
+      value: loading ? "..." : formatBytes(totalSize),
+      icon: HardDrive,
+      color: "text-accent",
+    },
+    {
+      label: "Shared Files",
+      value: loading ? "..." : String(sharedBlobs.length),
+      icon: Users,
+      color: "text-primary",
+    },
+    {
+      label: "Last Activity",
+      value: loading ? "..." : lastUpload,
+      icon: Clock,
+      color: "text-accent",
+    },
+  ];
 
   const handleDownload = async (b: ShelbyBlob) => {
     if (!account) {
@@ -307,25 +338,17 @@ export default function FilesPage() {
       </div>
 
       {/* Stats Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="glass-card p-4 rounded-xl border-primary/10 flex items-center gap-4">
-          <div className="h-10 w-10 rounded-lg bg-primary/5 flex items-center justify-center text-primary">
-            <Database className="h-5 w-5" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.map((s) => (
+          <div
+            key={s.label}
+            className="glass-card p-5 hover:glow-sm transition-all duration-300 border-l-2 border-l-transparent hover:border-l-primary"
+          >
+            <s.icon className={`h-5 w-5 ${s.color} mb-3`} />
+            <div className="text-3xl font-bold mb-1">{s.value}</div>
+            <div className="text-xs text-muted-foreground uppercase tracking-widest font-bold">{s.label}</div>
           </div>
-          <div>
-            <p className="text-[10px] uppercase font-bold text-muted-foreground">My Assets</p>
-            <p className="text-xl font-bold">{blobs.length}</p>
-          </div>
-        </div>
-        <div className="glass-card p-4 rounded-xl border-accent/10 flex items-center gap-4">
-          <div className="h-10 w-10 rounded-lg bg-accent/5 flex items-center justify-center text-accent">
-            <Users className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-[10px] uppercase font-bold text-muted-foreground">Shared</p>
-            <p className="text-xl font-bold">{sharedBlobs.length}</p>
-          </div>
-        </div>
+        ))}
       </div>
 
       {/* Search */}
