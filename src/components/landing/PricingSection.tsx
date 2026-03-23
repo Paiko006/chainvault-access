@@ -110,9 +110,15 @@ export function PricingSection() {
     }
 
     // 1. Simulate payment/Sync with Shelby Network
-    const tid = toast.loading(`Memproses pembayaran ${plan.price} ShelbyUSD dan merelasikan ke jaringan Shelby...`);
+    const tid = toast.loading(`Processing payment of ${plan.price} ShelbyUSD and syncing to Shelby network...`);
     
     try {
+      // DISABLED: User requested to turn off the upgrade feature for now
+      toast.info("Upgrade feature coming soon! Stay tuned for updates. 🚀");
+      return;
+      
+      /* Original logic preserved below for future re-enabling */
+      /*
       // Calculate bytes
       const gb = parseInt(plan.storage);
       const bytesLimit = gb * 1024 * 1024 * 1024;
@@ -126,17 +132,27 @@ export function PricingSection() {
       const numChunksets = expectedTotalChunksets(quotaData.length, chunksetSize);
 
       // Step B: Pay for the plan (ShelbyUSD Coin Transfer)
-      const payTx = await signAndSubmitTransaction({
-        data: {
-          function: "0x1::coin::transfer",
-          typeArguments: [SUSD_TOKEN_ADDRESS],
-          functionArguments: [
-            RECIPIENT_ADDRESS,  // The destination address
-            parseInt(plan.price) * 100_000_000 // The amount (u64, assuming 8 decimals)
-          ]
+      try {
+        const payTx = await signAndSubmitTransaction({
+          data: {
+            function: "0x1::coin::transfer",
+            typeArguments: [SUSD_TOKEN_ADDRESS],
+            functionArguments: [
+              RECIPIENT_ADDRESS,  // The destination address
+              parseInt(plan.price) * 100_000_000 // The amount (u64, assuming 8 decimals)
+            ]
+          }
+        });
+        await shelbyClient.coordination.aptos.waitForTransaction({ transactionHash: payTx.hash });
+      } catch (err: any) {
+        console.warn("[Pricing] Payment failed or module missing:", err);
+        if (err.message?.includes("Linker Error") || err.message?.includes("doesn't exist")) {
+          toast.info("Token ShelbyUSD belum ter-deploy. Menjalankan mode simulasi...", { id: tid });
+          // Proceed to Step C anyway to keep the UI/Sync functional for demo
+        } else {
+          throw err; // Rethrow actual rejections
         }
-      });
-      await shelbyClient.coordination.aptos.waitForTransaction({ transactionHash: payTx.hash });
+      }
 
       // Step C: Register Metadata on Shelby Network (Provisioning)
       const tx = await signAndSubmitTransaction({
@@ -162,12 +178,13 @@ export function PricingSection() {
 
       // 2. Finalize locally
       localStorage.setItem(QUOTA_STORAGE_KEY, bytesLimit.toString());
-      toast.success(`Sinkronisasi Berhasil! Kapasitas ${plan.storage} kini tertanam di wallet Anda. 🚀`, { id: tid });
+      toast.success(`Sync Successful! Your ${plan.storage} capacity is now secured to your wallet. 🚀`, { id: tid });
       
       setTimeout(() => navigate("/dashboard"), 1000);
+      */
     } catch (err: any) {
       console.error("[Pricing] Upgrade failed:", err);
-      toast.error("Gagal melakukan upgrade: " + (err.message || "Transaksi ditolak"), { id: tid });
+      toast.error("Upgrade failed: " + (err.message || "Transaction rejected"), { id: tid });
     }
   };
 
@@ -180,10 +197,10 @@ export function PricingSection() {
         <div className="max-w-3xl mx-auto text-center mb-16">
           <h2 className="text-[10px] uppercase tracking-[0.2em] font-black text-primary mb-4">Pricing Plans</h2>
           <h3 className="text-3xl md:text-5xl font-bold mb-6">
-            Penyimpanan Aman, <span className="gradient-text">Harga Transparan</span>
+            Secure Storage, <span className="gradient-text">Transparent Pricing</span>
           </h3>
           <p className="text-muted-foreground text-lg">
-            Upgrade kapasitas vault Anda secara permanen di jaringan Shelby menggunakan ShelbyUSD.
+            Upgrade your vault capacity permanently on the Shelby network using ShelbyUSD.
           </p>
         </div>
 
@@ -200,11 +217,11 @@ export function PricingSection() {
               >
                 {isActive && (
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-accent text-black text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg shadow-accent/20">
-                    Paket Aktif
+                    Active Plan
                   </div>
                 ) || plan.highlight && (
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg shadow-primary/20">
-                    Paling Populer
+                    Most Popular
                   </div>
                 )}
 
@@ -222,7 +239,7 @@ export function PricingSection() {
                   <div className="flex items-baseline gap-1">
                     <span className="text-4xl font-bold">{plan.price}</span>
                     <span className="text-xl font-bold text-primary">ShelbyUSD</span>
-                    {plan.price !== "0" && <span className="text-muted-foreground text-sm">/ bulan</span>}
+                    {plan.price !== "0" && <span className="text-muted-foreground text-sm">/ month</span>}
                   </div>
                   <p className="text-muted-foreground text-sm mt-3 leading-relaxed">
                     {plan.description}
@@ -242,11 +259,11 @@ export function PricingSection() {
 
                 <Button
                   variant={isActive ? "outline" : plan.highlight ? "hero" : "outline"}
-                  disabled={isActive || (!isUpgrade && plan.price !== "0")}
+                  disabled={true} // Matikan fitur upgrade
                   className={`w-full py-6 rounded-xl font-bold uppercase tracking-widest text-[11px] transition-all group-hover:scale-[1.02] ${!plan.highlight && !isActive ? 'hover:bg-white/5' : ''} ${isActive ? 'border-accent/40 text-accent opacity-100 cursor-default' : ''}`}
                   onClick={() => handleUpgrade(plan)}
                 >
-                  {isActive ? "Paket Aktif" : plan.price === "0" ? "Mulai Gratis" : isUpgrade ? "Upgrade Sekarang" : "Paket Anda"}
+                  {isActive ? "Active Plan" : "Coming Soon"}
                 </Button>
               </div>
             );
@@ -255,9 +272,9 @@ export function PricingSection() {
 
         <div className="mt-16 glass-card p-8 rounded-2xl border-dashed border-2 border-border/50 text-center max-w-2xl mx-auto">
           <p className="text-sm text-muted-foreground">
-            Butuh kapasitas lebih dari 500 GB untuk kebutuhan korporat? 
-            <a href="#" className="mx-1 text-primary hover:underline font-bold">Hubungi Tim Shelby</a> 
-            untuk solusi penyimpanan kustom.
+            Need more than 500 GB for enterprise requirements? 
+            <a href="#" className="mx-1 text-primary hover:underline font-bold">Contact Shelby Team</a> 
+            for custom storage solutions.
           </p>
         </div>
       </div>

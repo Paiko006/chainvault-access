@@ -1,7 +1,7 @@
 import { Lock } from "lucide-react";
 
 const links = [
-  { label: "Docs", href: "#" },
+  { label: "Docs", href: "https://docs.shelby.xyz/" },
   { label: "GitHub", href: "#" },
   { label: "Community", href: "#" },
   { label: "Terms", href: "#" },

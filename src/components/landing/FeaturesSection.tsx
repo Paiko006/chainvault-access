@@ -4,23 +4,23 @@ import { Shield, HardDrive, Link2, EyeOff } from "lucide-react";
 const features = [
   {
     icon: Shield,
-    title: "Wallet Protected Files",
-    description: "Only authorized wallet addresses can access your files. Cryptographic security, zero trust.",
+    title: "Wallet-Protected Encryption",
+    description: "Your file security is tied to your Aptos wallet signature. Only you hold the decryption key.",
   },
   {
     icon: HardDrive,
     title: "Decentralized Storage",
-    description: "Files are stored across distributed nodes. No single point of failure, no central authority.",
+    description: "Data is stored across the global Shelby network. Secure, permanent, and always available.",
   },
   {
     icon: Link2,
-    title: "Shareable Access Links",
-    description: "Generate secure links that verify wallet ownership before granting file access.",
+    title: "Cross-Device Synchronization",
+    description: "Access your file history and storage quota automatically on any device once connected.",
   },
   {
     icon: EyeOff,
-    title: "Private File Control",
-    description: "Full control over who sees your files. Revoke access anytime with a single click.",
+    title: "Privacy-First Control",
+    description: "Complete control over your privacy. Manage data ownership without third-party intermediaries.",
   },
 ];
 
@@ -40,10 +40,10 @@ export function FeaturesSection() {
       <div className="container max-w-6xl mx-auto">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Built for <span className="gradient-text">Web3 Security</span>
+            Premium <span className="gradient-text">Web3 Security</span>
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
-            Enterprise-grade file security powered by blockchain technology.
+            Enterprise-grade file security powered by decentralized blockchain technology.
           </p>
         </div>
 
