@@ -8,6 +8,7 @@ import { Link } from "react-router-dom";
 import { shortenAddress } from "@/lib/wallet";
 import { fetchAccountBlobs, ShelbyBlob, formatBytes, fromShelbyTimestamp } from "@/lib/shelby-indexer";
 import { getVaultKey } from "@/lib/crypto";
+import { QUOTA_STORAGE_KEY, DEFAULT_QUOTA } from "@/components/landing/PricingSection";
 
 export default function DashboardHome() {
   const { connected, account, signMessage } = useWallet();
@@ -17,6 +18,12 @@ export default function DashboardHome() {
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [showKey, setShowKey] = useState(false);
   const [vaultSeed, setVaultSeed] = useState<string | null>(null);
+  const [quota, setQuota] = useState(DEFAULT_QUOTA);
+
+  useEffect(() => {
+    const stored = localStorage.getItem(QUOTA_STORAGE_KEY);
+    if (stored) setQuota(parseInt(stored));
+  }, []);
 
   useEffect(() => {
     if (account) {
@@ -177,7 +184,7 @@ export default function DashboardHome() {
             <div className="text-3xl font-bold mb-1">
               {s.value}
               {s.label === "Capacity Used" && !loading && (
-                <span className="text-[10px] text-muted-foreground ml-1 font-normal tracking-tight">/ 5 GB</span>
+                <span className="text-[10px] text-muted-foreground ml-1 font-normal tracking-tight">/ {formatBytes(quota)}</span>
               )}
             </div>
             <div className="text-xs text-muted-foreground uppercase tracking-widest font-bold">{s.label}</div>

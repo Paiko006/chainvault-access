@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { Upload, X, Plus, FileText, Loader2, ExternalLink } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import { Upload, X, Plus, FileText, Loader2, ExternalLink, HardDrive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
@@ -27,7 +27,8 @@ function saveToLocalStorage(blob: StoredBlob) {
 }
 
 import { getVaultKey, encryptData, ENCRYPTION_PREFIX } from "@/lib/crypto";
-import { PUBLIC_SHELBY_API_KEY } from "@/lib/shelby-indexer";
+import { PUBLIC_SHELBY_API_KEY, fetchAccountBlobs, formatBytes } from "@/lib/shelby-indexer";
+import { QUOTA_STORAGE_KEY, DEFAULT_QUOTA } from "@/components/landing/PricingSection";
 
 export default function UploadPage() {
   const [files, setFiles] = useState<File[]>([]);
@@ -41,7 +42,34 @@ export default function UploadPage() {
 
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
+  const [usedBytes, setUsedBytes] = useState(0);
+  const [loadingUsed, setLoadingUsed] = useState(false);
+  const [quota, setQuota] = useState(DEFAULT_QUOTA);
   const shelbyClient = useShelbyClient();
+
+  useEffect(() => {
+    const stored = localStorage.getItem(QUOTA_STORAGE_KEY);
+    if (stored) setQuota(parseInt(stored));
+  }, []);
+
+  useEffect(() => {
+    async function checkQuota() {
+      if (connected && account) {
+        setLoadingUsed(true);
+        try {
+          const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || "";
+          const blobs = await fetchAccountBlobs(account.address.toString(), apiKey);
+          const total = blobs.reduce((sum, b) => sum + Number(b.size), 0);
+          setUsedBytes(total);
+        } catch (err) {
+          console.error("[Upload] Quota check failed:", err);
+        } finally {
+          setLoadingUsed(false);
+        }
+      }
+    }
+    checkQuota();
+  }, [connected, account]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -78,6 +106,12 @@ export default function UploadPage() {
     }
     if (files.length === 0) {
       toast.error("Please select at least one file.");
+      return;
+    }
+
+    const totalNewSize = files.reduce((s, f) => s + f.size, 0);
+    if (usedBytes + totalNewSize > quota) {
+      toast.error(`Quota Exceeded! You are trying to upload ${formatBytes(totalNewSize)}, but you only have ${formatBytes(quota - usedBytes)} remaining.`);
       return;
     }
 
@@ -247,6 +281,22 @@ export default function UploadPage() {
         >
           Get APT <ExternalLink className="h-3 w-3" />
         </a>
+      </div>
+
+      <div className="glass-card px-4 py-3 rounded-xl border border-accent/20 bg-accent/5 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+           <HardDrive className="h-4 w-4 text-accent" />
+           <div className="text-xs">
+              <span className="text-muted-foreground uppercase font-bold text-[9px] block">Vault Capacity</span>
+              <span className="font-mono font-bold">{loadingUsed ? "Calculating..." : `${formatBytes(usedBytes)} / ${formatBytes(quota)}`}</span>
+           </div>
+        </div>
+        <div className="w-32 h-1.5 bg-muted rounded-full overflow-hidden">
+           <div 
+             className="h-full bg-accent rounded-full transition-all duration-500" 
+             style={{ width: `${Math.min((usedBytes / quota) * 100, 100)}%` }}
+           />
+        </div>
       </div>
 
       {/* Drop zone */}

@@ -38,6 +38,7 @@ import {
 import { shortenAddress } from "@/lib/wallet";
 import { getVaultKey, decryptData, ENCRYPTION_PREFIX } from "@/lib/crypto";
 import { useNotifications } from "@/hooks/use-notifications";
+import { QUOTA_STORAGE_KEY, DEFAULT_QUOTA } from "@/components/landing/PricingSection";
 import { 
   Tabs, 
   TabsContent, 
@@ -61,6 +62,12 @@ export default function FilesPage() {
   const [loading, setLoading] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [quota, setQuota] = useState(DEFAULT_QUOTA);
+
+  useEffect(() => {
+    const stored = localStorage.getItem(QUOTA_STORAGE_KEY);
+    if (stored) setQuota(parseInt(stored));
+  }, []);
 
   // Decryption Modal State
   const [isDecryptModalOpen, setIsDecryptModalOpen] = useState(false);
@@ -329,7 +336,7 @@ export default function FilesPage() {
             <p className="text-[10px] uppercase font-bold text-muted-foreground">Capacity Used</p>
             <p className="text-xl font-bold">
                {loading ? '...' : formatBytes(totalSize)}
-               <span className="text-[10px] text-muted-foreground ml-1.5 font-normal tracking-tight">/ 5 GB</span>
+               <span className="text-[10px] text-muted-foreground ml-1.5 font-normal tracking-tight">/ {formatBytes(quota)}</span>
             </p>
           </div>
         </div>

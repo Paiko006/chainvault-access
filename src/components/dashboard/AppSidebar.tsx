@@ -3,6 +3,7 @@ import { useLocation, Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { fetchAccountBlobs, formatBytes } from "@/lib/shelby-indexer";
+import { QUOTA_STORAGE_KEY, DEFAULT_QUOTA } from "@/components/landing/PricingSection";
 import {
   LayoutDashboard,
   FileText,
@@ -29,9 +30,15 @@ export function AppSidebar() {
   const { account, connected } = useWallet();
   const [usedBytes, setUsedBytes] = useState(0);
   const [loading, setLoading] = useState(false);
-  const QUOTA = 5 * 1024 * 1024 * 1024; // 5 GB
+  const [quota, setQuota] = useState(DEFAULT_QUOTA);
 
   useEffect(() => {
+    // Sync quota from local storage
+    const stored = localStorage.getItem(QUOTA_STORAGE_KEY);
+    if (stored) {
+       setQuota(parseInt(stored));
+    }
+
     async function loadCapacity() {
       if (connected && account) {
         setLoading(true);
@@ -52,7 +59,7 @@ export function AppSidebar() {
     loadCapacity();
   }, [connected, account]);
 
-  const percentage = Math.min((usedBytes / QUOTA) * 100, 100);
+  const percentage = Math.min((usedBytes / quota) * 100, 100);
 
   return (
     <aside className="hidden lg:flex flex-col w-64 border-r border-border bg-sidebar shrink-0 h-screen sticky top-0">
@@ -96,7 +103,7 @@ export function AppSidebar() {
           </div>
           <div className="text-[11px] font-bold text-muted-foreground mt-2 font-mono flex items-center justify-between">
             <span>{loading ? "..." : formatBytes(usedBytes)}</span>
-            <span className="text-[9px] opacity-60">/ 5 GB</span>
+            <span className="text-[9px] opacity-60">/ {formatBytes(quota)}</span>
           </div>
         </div>
       </div>

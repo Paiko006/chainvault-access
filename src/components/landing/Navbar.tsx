@@ -16,7 +16,7 @@ export function Navbar() {
         <div className="hidden md:flex items-center gap-8">
           <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Features</a>
           <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Docs</a>
-          <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
+          <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-semibold text-primary">Pricing</a>
         </div>
 
         <WalletButton />
