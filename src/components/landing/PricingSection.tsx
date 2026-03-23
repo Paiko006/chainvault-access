@@ -125,13 +125,12 @@ export function PricingSection() {
       const chunksetSize = provider.config.erasure_k * provider.config.chunkSizeBytes;
       const numChunksets = expectedTotalChunksets(quotaData.length, chunksetSize);
 
-      // Step B: Pay for the plan (ShelbyUSD Transfer)
+      // Step B: Pay for the plan (ShelbyUSD Coin Transfer)
       const payTx = await signAndSubmitTransaction({
         data: {
-          function: "0x1::primary_fungible_store::transfer",
-          typeArguments: [],
+          function: "0x1::coin::transfer",
+          typeArguments: [SUSD_TOKEN_ADDRESS],
           functionArguments: [
-            SUSD_TOKEN_ADDRESS, // The asset (Fungible Asset Metadata address)
             RECIPIENT_ADDRESS,  // The destination address
             parseInt(plan.price) * 100_000_000 // The amount (u64, assuming 8 decimals)
           ]
