@@ -129,8 +129,12 @@ export function PricingSection() {
       const payTx = await signAndSubmitTransaction({
         data: {
           function: "0x1::primary_fungible_store::transfer",
-          typeArguments: [SUSD_TOKEN_ADDRESS],
-          functionArguments: [RECIPIENT_ADDRESS, parseInt(plan.price) * 100_000_000] // Assuming 8 decimals
+          typeArguments: [],
+          functionArguments: [
+            SUSD_TOKEN_ADDRESS, // The asset (Fungible Asset Metadata address)
+            RECIPIENT_ADDRESS,  // The destination address
+            parseInt(plan.price) * 100_000_000 // The amount (u64, assuming 8 decimals)
+          ]
         }
       });
       await shelbyClient.coordination.aptos.waitForTransaction({ transactionHash: payTx.hash });
