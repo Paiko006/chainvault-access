@@ -16,7 +16,7 @@ const links = [
 export function Navbar() {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/30 bg-background/80 backdrop-blur-xl">
-      <div className="container max-w-6xl mx-auto flex items-center justify-between h-16 px-4">
+      <div className="container max-w-7xl mx-auto flex items-center justify-between h-16 px-6">
         <div className="flex items-center gap-4">
           <Sheet>
             <SheetTrigger asChild>
