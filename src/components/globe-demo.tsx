@@ -75,17 +75,17 @@ export default function GlobeDemo() {
               </span>
               Live Storage Network
             </div>
-            <h2 className="text-center text-2xl md:text-5xl font-bold text-black dark:text-white tracking-tight">
+            <h2 className="text-center text-2xl md:text-5xl font-bold text-white tracking-tight">
               Securing Data Worldwide
             </h2>
-            <p className="text-center text-sm md:text-lg font-normal text-neutral-600 dark:text-neutral-400 max-w-xl mt-4 mx-auto leading-relaxed">
+            <p className="text-center text-sm md:text-lg font-normal text-muted-foreground max-w-xl mt-4 mx-auto leading-relaxed">
               Real-time visualization of {providers.length || "active"} Storage Providers across the Shelby Testnet. 
               {loading ? " Fetching network state..." : " Your data is decentralized and globally distributed."}
             </p>
           </div>
         </motion.div>
         
-        <div className="absolute w-full bottom-0 inset-x-0 h-40 bg-gradient-to-b pointer-events-none select-none from-transparent dark:to-black to-white z-40" />
+        <div className="absolute w-full bottom-0 inset-x-0 h-40 bg-gradient-to-b pointer-events-none select-none from-transparent to-black z-40" />
         
         <div className="absolute w-full -bottom-12 md:-bottom-20 h-[32rem] md:h-full z-10">
           <Suspense fallback={
