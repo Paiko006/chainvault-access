@@ -18,7 +18,8 @@ import {
   ShieldCheck,
   Clock,
   Database,
-  Eye
+  Eye,
+  HardDrive
 } from "lucide-react";
 import { useDeleteBlobs } from "@shelby-protocol/react";
 import { toast } from "sonner";
@@ -240,6 +241,9 @@ export default function FilesPage() {
     }
   };
 
+  const totalSize = blobs.reduce((s, b) => s + Number(b.size), 0);
+  const quotaBytes = 5 * 1024 * 1024 * 1024; // 5 GB
+  
   if (!connected) {
     return (
       <div className="space-y-6">
@@ -319,11 +323,34 @@ export default function FilesPage() {
         </div>
         <div className="glass-card p-4 rounded-xl border-accent/10 flex items-center gap-4">
           <div className="h-10 w-10 rounded-lg bg-accent/5 flex items-center justify-center text-accent">
+            <HardDrive className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-[10px] uppercase font-bold text-muted-foreground">Capacity Used</p>
+            <p className="text-xl font-bold">
+               {loading ? '...' : formatBytes(totalSize)}
+               <span className="text-[10px] text-muted-foreground ml-1.5 font-normal tracking-tight">/ 5 GB</span>
+            </p>
+          </div>
+        </div>
+        <div className="glass-card p-4 rounded-xl border-accent/10 flex items-center gap-4">
+          <div className="h-10 w-10 rounded-lg bg-accent/5 flex items-center justify-center text-accent">
             <Users className="h-5 w-5" />
           </div>
           <div>
             <p className="text-[10px] uppercase font-bold text-muted-foreground">Shared</p>
             <p className="text-xl font-bold">{sharedBlobs.length}</p>
+          </div>
+        </div>
+        <div className="glass-card p-4 rounded-xl border-primary/10 flex items-center gap-4">
+          <div className="h-10 w-10 rounded-lg bg-primary/5 flex items-center justify-center text-primary">
+            <Clock className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-[10px] uppercase font-bold text-muted-foreground">Last Activity</p>
+            <p className="text-xl font-bold">
+               {blobs[0] ? fromShelbyTimestamp(blobs[0].created_at).toLocaleDateString() : "—"}
+            </p>
           </div>
         </div>
       </div>

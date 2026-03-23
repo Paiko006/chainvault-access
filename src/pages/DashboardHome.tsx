@@ -174,7 +174,12 @@ export default function DashboardHome() {
             className="glass-card p-5 hover:glow-sm transition-all duration-300 border-l-2 border-l-transparent hover:border-l-primary"
           >
             <s.icon className={`h-5 w-5 ${s.color} mb-3`} />
-            <div className="text-3xl font-bold mb-1">{s.value}</div>
+            <div className="text-3xl font-bold mb-1">
+              {s.value}
+              {s.label === "Capacity Used" && !loading && (
+                <span className="text-[10px] text-muted-foreground ml-1 font-normal tracking-tight">/ 5 GB</span>
+              )}
+            </div>
             <div className="text-xs text-muted-foreground uppercase tracking-widest font-bold">{s.label}</div>
           </div>
         ))}

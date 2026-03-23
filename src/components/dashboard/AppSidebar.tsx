@@ -57,7 +57,7 @@ export function AppSidebar() {
 
       <div className="px-3 py-4 border-t border-sidebar-border">
         <div className="glass-card px-3 py-3 rounded-lg">
-          <div className="text-xs text-muted-foreground mb-1">Storage Used</div>
+          <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70 mb-2">Capacity Used</div>
           <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
             <div className="h-full w-3/5 bg-gradient-to-r from-primary to-accent rounded-full" />
           </div>
