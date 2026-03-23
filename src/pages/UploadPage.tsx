@@ -27,8 +27,8 @@ function saveToLocalStorage(blob: StoredBlob) {
 }
 
 import { getVaultKey, encryptData, ENCRYPTION_PREFIX } from "@/lib/crypto";
-import { PUBLIC_SHELBY_API_KEY, fetchAccountBlobs, formatBytes } from "@/lib/shelby-indexer";
-import { QUOTA_STORAGE_KEY, DEFAULT_QUOTA } from "@/components/landing/PricingSection";
+import { PUBLIC_SHELBY_API_KEY, fetchAccountBlobs, formatBytes, syncUserQuota } from "@/lib/shelby-indexer";
+import { QUOTA_STORAGE_KEY, DEFAULT_QUOTA, QUOTA_BLOB_NAME } from "@/components/landing/PricingSection";
 
 export default function UploadPage() {
   const [files, setFiles] = useState<File[]>([]);
@@ -57,8 +57,17 @@ export default function UploadPage() {
       if (connected && account) {
         setLoadingUsed(true);
         try {
+          const addr = account.address.toString();
+          
+          // 1. Cross-Device Sync: Check network for updated quota
+          const networkQuota = await syncUserQuota(addr, QUOTA_BLOB_NAME);
+          if (networkQuota) {
+            setQuota(networkQuota);
+            localStorage.setItem(QUOTA_STORAGE_KEY, networkQuota.toString());
+          }
+
           const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || "";
-          const blobs = await fetchAccountBlobs(account.address.toString(), apiKey);
+          const blobs = await fetchAccountBlobs(addr, apiKey);
           const total = blobs.reduce((sum, b) => sum + Number(b.size), 0);
           setUsedBytes(total);
         } catch (err) {

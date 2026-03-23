@@ -33,12 +33,13 @@ import {
   formatBytes, 
   fromShelbyTimestamp, 
   fetchBlobData,
-  fetchSharedBlobs 
+  fetchSharedBlobs,
+  syncUserQuota 
 } from "@/lib/shelby-indexer";
 import { shortenAddress } from "@/lib/wallet";
 import { getVaultKey, decryptData, ENCRYPTION_PREFIX } from "@/lib/crypto";
 import { useNotifications } from "@/hooks/use-notifications";
-import { QUOTA_STORAGE_KEY, DEFAULT_QUOTA } from "@/components/landing/PricingSection";
+import { QUOTA_STORAGE_KEY, DEFAULT_QUOTA, QUOTA_BLOB_NAME } from "@/components/landing/PricingSection";
 import { 
   Tabs, 
   TabsContent, 
@@ -83,7 +84,14 @@ export default function FilesPage() {
       setLoading(true);
       try {
         const addr = account.address.toString();
-        // Pass the explicit apiKey so the indexer knows which key to use
+
+        // 1. Cross-Device Sync: Check network for updated quota
+        const networkQuota = await syncUserQuota(addr, QUOTA_BLOB_NAME);
+        if (networkQuota) {
+          setQuota(networkQuota);
+          localStorage.setItem(QUOTA_STORAGE_KEY, networkQuota.toString());
+        }
+
         const userBlobs = await fetchAccountBlobs(addr, apiKey);
         setBlobs(userBlobs);
 

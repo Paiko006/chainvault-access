@@ -193,6 +193,21 @@ export async function fetchBlobData(blobName: string, owner: string): Promise<Bl
 }
 
 /**
+ * Fetches the user's storage quota from the Shelby network (cross-device sync).
+ */
+export async function syncUserQuota(owner: string, blobName: string): Promise<number | null> {
+  try {
+    const blob = await fetchBlobData(blobName, owner);
+    const text = await blob.text();
+    const quota = parseInt(text);
+    return isNaN(quota) ? null : quota;
+  } catch (err) {
+    // If blob doesn't exist or error, return null
+    return null;
+  }
+}
+
+/**
  * Helper to convert Shelby microsecond timestamps to JS Date objects
  */
 export function fromShelbyTimestamp(micros: string | number): Date {
@@ -204,7 +219,9 @@ export function fromShelbyTimestamp(micros: string | number): Date {
  */
 export function formatBytes(bytes: number | string) {
   const b = Number(bytes);
+  if (b === 0) return "0 B";
   if (b < 1024) return `${b} B`;
   if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
-  return `${(b / (1024 * 1024)).toFixed(2)} MB`;
+  if (b < 1024 * 1024 * 1024) return `${(b / (1024 * 1024)).toFixed(2)} MB`;
+  return `${(b / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }

@@ -6,9 +6,9 @@ import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { useAptBalance } from "@aptos-labs/react";
 import { Link } from "react-router-dom";
 import { shortenAddress } from "@/lib/wallet";
-import { fetchAccountBlobs, ShelbyBlob, formatBytes, fromShelbyTimestamp } from "@/lib/shelby-indexer";
+import { fetchAccountBlobs, ShelbyBlob, formatBytes, fromShelbyTimestamp, syncUserQuota } from "@/lib/shelby-indexer";
 import { getVaultKey } from "@/lib/crypto";
-import { QUOTA_STORAGE_KEY, DEFAULT_QUOTA } from "@/components/landing/PricingSection";
+import { QUOTA_STORAGE_KEY, DEFAULT_QUOTA, QUOTA_BLOB_NAME } from "@/components/landing/PricingSection";
 
 export default function DashboardHome() {
   const { connected, account, signMessage } = useWallet();
@@ -53,8 +53,17 @@ export default function DashboardHome() {
       if (connected && account) {
         setLoading(true);
         try {
+          const addr = account.address.toString();
+          
+          // 1. Cross-Device Sync: Check network for updated quota
+          const networkQuota = await syncUserQuota(addr, QUOTA_BLOB_NAME);
+          if (networkQuota) {
+            setQuota(networkQuota);
+            localStorage.setItem(QUOTA_STORAGE_KEY, networkQuota.toString());
+          }
+
           const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || "";
-          const data = await fetchAccountBlobs(account.address.toString(), apiKey);
+          const data = await fetchAccountBlobs(addr, apiKey);
           setBlobs(data);
           setLastSync(new Date());
         } catch (err) {

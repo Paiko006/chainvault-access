@@ -2,8 +2,18 @@ import { Check, Zap, Shield, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { useWallet } from "@aptos-labs/wallet-adapter-react";
+import { useShelbyClient } from "@shelby-protocol/react";
+import { 
+  ShelbyBlobClient, 
+  createDefaultErasureCodingProvider, 
+  generateCommitments, 
+  expectedTotalChunksets 
+} from "@shelby-protocol/sdk/browser";
+import { AccountAddress } from "@aptos-labs/ts-sdk";
 
 export const QUOTA_STORAGE_KEY = "chainvault_quota";
+export const QUOTA_BLOB_NAME = ".quota";
 export const DEFAULT_QUOTA = 5 * 1024 * 1024 * 1024; // 5 GB
 
 const plans = [
@@ -59,23 +69,66 @@ const plans = [
 
 export function PricingSection() {
   const navigate = useNavigate();
+  const { account, connected, signAndSubmitTransaction } = useWallet();
+  const shelbyClient = useShelbyClient();
 
-  const handleUpgrade = (plan: typeof plans[0]) => {
+  const handleUpgrade = async (plan: typeof plans[0]) => {
     if (plan.price === "0") {
       navigate("/dashboard");
       return;
     }
 
-    // Calculate bytes
-    const gb = parseInt(plan.storage);
-    const bytes = gb * 1024 * 1024 * 1024;
+    if (!connected || !account) {
+      toast.error("Silahkan hubungkan wallet Anda terlebih dahulu untuk membeli paket.");
+      return;
+    }
+
+    // 1. Simulate payment/Sync with Shelby Network
+    const tid = toast.loading(`Memproses pembayaran ${plan.price} $APT dan merelasikan ke jaringan Shelby...`);
     
-    localStorage.setItem(QUOTA_STORAGE_KEY, bytes.toString());
-    toast.success(`Berhasil upgrade ke ${plan.name}! Kapasitas Anda sekarang ${plan.storage}. 🚀`);
-    
-    setTimeout(() => {
-      navigate("/dashboard");
-    }, 1500);
+    try {
+      // Calculate bytes
+      const gb = parseInt(plan.storage);
+      const bytesLimit = gb * 1024 * 1024 * 1024;
+      
+      // Step A: Prepare a small metadata blob with the quota value
+      const quotaData = new TextEncoder().encode(bytesLimit.toString());
+      const provider = await createDefaultErasureCodingProvider();
+      const commitments = await generateCommitments(provider, quotaData);
+      const chunksetSize = provider.config.erasure_k * provider.config.chunkSizeBytes;
+      const numChunksets = expectedTotalChunksets(quotaData.length, chunksetSize);
+
+      // Step B: Register on-chain
+      const tx = await signAndSubmitTransaction({
+        data: ShelbyBlobClient.createRegisterBlobPayload({
+          account: AccountAddress.from(account.address.toString()),
+          blobName: QUOTA_BLOB_NAME,
+          blobSize: quotaData.length,
+          blobMerkleRoot: commitments.blob_merkle_root,
+          numChunksets,
+          expirationMicros: (Date.now() + 10 * 365 * 24 * 60 * 60 * 1000) * 1000, // 10 years
+          encoding: provider.config.enumIndex
+        })
+      });
+
+      await shelbyClient.coordination.aptos.waitForTransaction({ transactionHash: tx.hash });
+      
+      // Step C: Upload real data
+      await shelbyClient.rpc.putBlob({
+        account: account.address.toString(),
+        blobName: QUOTA_BLOB_NAME,
+        blobData: quotaData
+      });
+
+      // 2. Finalize locally
+      localStorage.setItem(QUOTA_STORAGE_KEY, bytesLimit.toString());
+      toast.success(`Sinkronisasi Berhasil! Kapasitas ${plan.storage} kini tertanam di wallet Anda. 🚀`, { id: tid });
+      
+      setTimeout(() => navigate("/dashboard"), 1000);
+    } catch (err: any) {
+      console.error("[Pricing] Upgrade failed:", err);
+      toast.error("Gagal melakukan upgrade: " + (err.message || "Transaksi ditolak"), { id: tid });
+    }
   };
 
   return (
