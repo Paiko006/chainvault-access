@@ -6,14 +6,23 @@ import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { useAptBalance } from "@aptos-labs/react";
 import { Link } from "react-router-dom";
 import { shortenAddress } from "@/lib/wallet";
-import { fetchAccountBlobs, fetchSharedBlobs, ShelbyBlob, formatBytes, fromShelbyTimestamp, syncUserQuota } from "@/lib/shelby-indexer";
+import { formatBytes, fromShelbyTimestamp, syncUserQuota } from "@/lib/shelby-indexer";
 import { getVaultKey, normalizeAptosAddress } from "@/lib/crypto";
 import { QUOTA_STORAGE_KEY, DEFAULT_QUOTA } from "@/components/landing/PricingSection";
+import { useAccountBlobs } from "@shelby-protocol/react";
+import { BlobMetadata } from "@shelby-protocol/sdk/browser";
 
 export default function DashboardHome() {
   const { connected, account, signMessage } = useWallet();
   const { data: aptBalance, isLoading: balanceLoading } = useAptBalance();
-  const [blobs, setBlobs] = useState<ShelbyBlob[]>([]);
+  
+  // Official Shelby SDK hook for account assets
+  const { data: blobsRaw = [], isLoading: blobsLoading, error: blobsError } = useAccountBlobs({
+    account: account?.address.toString() || "",
+  });
+  
+  const blobs = blobsRaw as unknown as BlobMetadata[];
+  
   const [loading, setLoading] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [showKey, setShowKey] = useState(false);
@@ -51,45 +60,25 @@ export default function DashboardHome() {
     }
   };
 
+  // Effect to sync quota
   useEffect(() => {
-    async function loadData() {
+    async function updateQuota() {
       if (connected && account) {
-        setLoading(true);
-        try {
-          const addr = account.address.toString();
-          
-          // 1. Cross-Device Sync: Check network for updated quota
-          const networkQuota = await syncUserQuota(addr);
-          if (networkQuota) {
-            setQuota(networkQuota);
-            localStorage.setItem(QUOTA_STORAGE_KEY, networkQuota.toString());
-          }
-
-          const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || "";
-          
-          // 2. Fetch both personal and shared blobs for a complete dashboard
-          const [personal, shared] = await Promise.all([
-            fetchAccountBlobs(addr, apiKey),
-            fetchSharedBlobs(addr, apiKey)
-          ]);
-          
-          setBlobs([...personal, ...shared]);
-          setLastSync(new Date());
-        } catch (err) {
-          console.error("Failed to sync blobs:", err);
-          toast.error("Cloud Sync Failed", {
-             description: "We couldn't reach the Shelby Indexer. Showing local data only."
-          });
-        } finally {
-          setLoading(false);
+        const addr = account.address.toString();
+        const networkQuota = await syncUserQuota(addr);
+        if (networkQuota) {
+          setQuota(networkQuota);
+          localStorage.setItem(QUOTA_STORAGE_KEY, networkQuota.toString());
         }
       }
     }
-    loadData();
-  }, [connected, account, refreshKey]);
+    updateQuota();
+  }, [connected, account]);
 
-  const totalSize = blobs.reduce((s, b) => s + Number(b.size), 0);
-  const lastUpload = blobs[0] ? fromShelbyTimestamp(blobs[0].created_at).toLocaleDateString() : "—";
+  const isLoading = loading || blobsLoading;
+
+  const totalSize = blobs.reduce((s, b) => s + (b.size || 0), 0);
+  const lastUpload = blobs[0] ? fromShelbyTimestamp(blobs[0].creationMicros).toLocaleDateString() : "—";
 
   const aptDisplay = balanceLoading
     ? "…"
@@ -175,6 +164,8 @@ export default function DashboardHome() {
               variant="outline" 
               size="sm" 
               onClick={() => {
+                // useAccountBlobs automatically refetches, but we can trigger a slight window reload 
+                // if we want to be absolutely sure all contexts (like Quota) are fresh.
                 setRefreshKey(prev => prev + 1);
               }}
               disabled={loading}
@@ -393,7 +384,7 @@ export default function DashboardHome() {
               </thead>
               <tbody>
                 {blobs.slice(0, 10).map((b, idx) => {
-                  const rawName = b.blob_name.includes('/') ? b.blob_name.split('/').slice(1).join('/') : b.blob_name;
+                  const rawName = b.name.includes('/') ? b.name.split('/').slice(1).join('/') : b.name;
                   // Handle both shelbysecure/ folder and old ENC-v1- prefix
                   const cleanName = rawName.replace("shelbysecure/", "").replace("ENC-v1-", "").replace(".vault", "");
                   
@@ -414,7 +405,7 @@ export default function DashboardHome() {
                         {formatBytes(b.size)}
                       </td>
                       <td className="px-5 py-3.5 text-muted-foreground hidden md:table-cell">
-                        {fromShelbyTimestamp(b.created_at).toLocaleDateString()}
+                        {fromShelbyTimestamp(b.creationMicros).toLocaleDateString()}
                       </td>
                       <td className="px-5 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-2">

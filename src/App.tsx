@@ -51,10 +51,11 @@ const App = () => {
       apiKey: shelbyApiKey,
     },
     indexer: {
-      baseUrl: "https://api.testnet.aptoslabs.com/nocode/v1/public/alias/shelby/testnet/v1/graphql",
-      apiKey: shelbyApiKey,
+      // Standard Aptos Testnet Indexer as per documentation for blob listing
+      baseUrl: "https://api.testnet.aptoslabs.com/v1/graphql",
+      apiKey: aptosApiKey,
     }
-  }), [shelbyApiKey]);
+  }), [shelbyApiKey, aptosApiKey]);
 
   return (
     <QueryClientProvider client={queryClient}>

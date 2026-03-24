@@ -3,7 +3,7 @@
  * Fetches blob metadata and account statistics directly from the Shelby GraphQL Indexer.
  */
 
-const SHELBY_INDEXER_URL = "https://api.testnet.aptoslabs.com/nocode/v1/public/alias/shelby/testnet/v1/graphql";
+const SHELBY_INDEXER_URL = "https://api.testnet.aptoslabs.com/v1/graphql";
 export const PUBLIC_SHELBY_API_KEY = "AG-7FPFEZSPINUP4F7HKVSIO1ZPOEDZ8E5WN";
 
 export interface ShelbyBlob {
