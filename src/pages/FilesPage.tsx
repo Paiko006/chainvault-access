@@ -30,14 +30,14 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
+  fetchAccountBlobs, 
+  ShelbyBlob, 
   formatBytes, 
   fromShelbyTimestamp, 
   fetchBlobData,
   fetchSharedBlobs,
   syncUserQuota 
 } from "@/lib/shelby-indexer";
-import { useAccountBlobs } from "@shelby-protocol/react";
-import { BlobMetadata } from "@shelby-protocol/sdk/browser";
 import { shortenAddress } from "@/lib/wallet";
 import { getVaultKey, decryptData, ENCRYPTION_PREFIX, normalizeAptosAddress } from "@/lib/crypto";
 import { useNotifications } from "@/hooks/use-notifications";
@@ -60,16 +60,10 @@ export default function FilesPage() {
   const { connected, account, signAndSubmitTransaction, signMessage } = useWallet();
   const { addNotification } = useNotifications();
   const [search, setSearch] = useState("");
-  const [sharedBlobs, setSharedBlobs] = useState<BlobMetadata[]>([]);
-  const [manualLoading, setManualLoading] = useState(false);
+  const [blobs, setBlobs] = useState<ShelbyBlob[]>([]);
+  const [sharedBlobs, setSharedBlobs] = useState<ShelbyBlob[]>([]);
+  const [loading, setLoading] = useState(false);
   const [refresh, setRefresh] = useState(0);
-
-  // Official Shelby SDK hook for owned assets
-  const { data: blobsRaw = [], isLoading: blobsLoading } = useAccountBlobs({
-    account: account?.address.toString() || "",
-  });
-
-  const blobs = blobsRaw as unknown as BlobMetadata[];
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [isVaultLocked, setIsVaultLocked] = useState(true);
   const [quota, setQuota] = useState(DEFAULT_QUOTA);
@@ -101,7 +95,7 @@ export default function FilesPage() {
 
   // Decryption Modal State
   const [isDecryptModalOpen, setIsDecryptModalOpen] = useState(false);
-  const [activeSharedBlob, setActiveSharedBlob] = useState<BlobMetadata | null>(null);
+  const [activeSharedBlob, setActiveSharedBlob] = useState<ShelbyBlob | null>(null);
   const [manualKey, setManualKey] = useState("");
 
   const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY;
@@ -109,8 +103,8 @@ export default function FilesPage() {
   useEffect(() => {
     if (!connected || !account) return;
     
-    const loadSharedFiles = async () => {
-      setManualLoading(true);
+    const loadFiles = async () => {
+      setLoading(true);
       try {
         const addr = account.address.toString();
 
@@ -121,24 +115,26 @@ export default function FilesPage() {
           localStorage.setItem(QUOTA_STORAGE_KEY, networkQuota.toString());
         }
 
-        const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || "";
+        const userBlobs = await fetchAccountBlobs(addr, apiKey);
+        setBlobs(userBlobs);
+
         const shared = await fetchSharedBlobs(addr, apiKey);
-        setSharedBlobs(shared as unknown as BlobMetadata[]);
+        setSharedBlobs(shared);
       } catch (err) {
-        console.error("[ChainVault] Error fetching shared files:", err);
+        console.error("[ChainVault] Error fetching files:", err);
       } finally {
-        setManualLoading(false);
+        setLoading(false);
       }
     };
 
-    loadSharedFiles();
-  }, [connected, account, refresh]);
+    loadFiles();
+  }, [connected, account, refresh, apiKey]);
 
   const filtered = blobs.filter((b) =>
-    b.name.toLowerCase().includes(search.toLowerCase())
+    b.blob_name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleDownload = async (b: BlobMetadata) => {
+  const handleDownload = async (b: ShelbyBlob) => {
     if (!account) {
       toast.error("Please connect your wallet first");
       return;
@@ -151,10 +147,10 @@ export default function FilesPage() {
       return;
     }
 
-    setDownloadingId(b.name);
+    setDownloadingId(b.blob_name);
     try {
       // Indexer returns "@address/suffix". Strip prefix for logic.
-      const cleanName = b.name.includes('/') ? b.name.split('/').slice(1).join('/') : b.name;
+      const cleanName = b.blob_name.includes('/') ? b.blob_name.split('/').slice(1).join('/') : b.blob_name;
       const isEncrypted = cleanName.startsWith(ENCRYPTION_PREFIX) || 
                           cleanName.startsWith("ENC:v1:") || 
                           cleanName.toLowerCase().endsWith(".vault");
@@ -162,7 +158,7 @@ export default function FilesPage() {
       toast.loading(isEncrypted ? "Decrypting from Vault..." : "Downloading from Shelby...", { id: "dl-toast" });
 
       // 1. Fetch raw data from Shelby (fetchBlobData handles its own prefix stripping for the URL)
-      const rawBlob = await fetchBlobData(b.name, account.address.toString());
+      const rawBlob = await fetchBlobData(b.blob_name, b.owner);
       
       let finalBlob = rawBlob;
 
@@ -203,18 +199,18 @@ export default function FilesPage() {
   const handleSharedDownload = async () => {
     if (!activeSharedBlob || !manualKey || !account) return;
     
-    setDownloadingId(activeSharedBlob.name);
+    setDownloadingId(activeSharedBlob.blob_name);
     setIsDecryptModalOpen(false);
     
     try {
-      const cleanName = activeSharedBlob.name.includes('/') 
-        ? activeSharedBlob.name.split('/').slice(1).join('/') 
-        : activeSharedBlob.name;
+      const cleanName = activeSharedBlob.blob_name.includes('/') 
+        ? activeSharedBlob.blob_name.split('/').slice(1).join('/') 
+        : activeSharedBlob.blob_name;
       
       toast.loading("Fetching & Decrypting shared asset...", { id: "dl-shared-toast" });
 
       // 1. Fetch raw data
-      const rawBlob = await fetchBlobData(activeSharedBlob.name, account.address.toString());
+      const rawBlob = await fetchBlobData(activeSharedBlob.blob_name, activeSharedBlob.owner);
       
       // 2. Use manual key provided by owner
       const key = await getVaultKey(manualKey);
@@ -272,9 +268,9 @@ export default function FilesPage() {
 
     try {
       // SDK expects the raw blob name without the "@address/" prefix
-      const cleanName = blobToDelete.name.includes('/') 
-        ? blobToDelete.name.split('/').slice(1).join('/') 
-        : blobToDelete.name;
+      const cleanName = blobToDelete.blob_name.includes('/') 
+        ? blobToDelete.blob_name.split('/').slice(1).join('/') 
+        : blobToDelete.blob_name;
 
       await deleteBlobs.mutateAsync({
         blobNames: [cleanName],
@@ -291,7 +287,7 @@ export default function FilesPage() {
     }
   };
 
-  const totalSize = blobs.reduce((s, b) => s + (b.size || 0), 0);
+  const totalSize = blobs.reduce((s, b) => s + Number(b.size), 0);
   const quotaBytes = 5 * 1024 * 1024 * 1024; // 5 GB
   
   if (!connected) {
@@ -339,10 +335,10 @@ export default function FilesPage() {
                 variant="outline" 
                 size="sm" 
                 onClick={() => setRefresh(r => r + 1)}
-                disabled={blobsLoading || manualLoading}
+                disabled={loading}
                 className="gap-2 h-8 rounded-lg"
               >
-                <RefreshCw className={`h-3.5 w-3.5 ${blobsLoading || manualLoading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
                 Sync
               </Button>
               <Link to="/dashboard/upload">
@@ -378,7 +374,7 @@ export default function FilesPage() {
           <div>
             <p className="text-[10px] uppercase font-bold text-muted-foreground">Capacity Used</p>
             <p className="text-xl font-bold">
-               {blobsLoading ? '...' : formatBytes(totalSize)}
+               {loading ? '...' : formatBytes(totalSize)}
                <span className="text-[10px] text-muted-foreground ml-1.5 font-normal tracking-tight">/ {formatBytes(quota)}</span>
             </p>
           </div>
@@ -399,7 +395,7 @@ export default function FilesPage() {
           <div>
             <p className="text-[10px] uppercase font-bold text-muted-foreground">Last Activity</p>
             <p className="text-xl font-bold">
-               {blobs[0] ? fromShelbyTimestamp(blobs[0].creationMicros).toLocaleDateString() : "—"}
+               {blobs[0] ? fromShelbyTimestamp(blobs[0].created_at).toLocaleDateString() : "—"}
             </p>
           </div>
         </div>
@@ -462,7 +458,7 @@ export default function FilesPage() {
             </div>
           )}
 
-          {blobsLoading && blobs.length === 0 ? (
+          {loading && blobs.length === 0 ? (
             <div className="py-20 flex flex-col items-center justify-center gap-4">
               <Loader2 className="h-10 w-10 text-primary animate-spin" />
               <p className="text-sm text-muted-foreground animate-pulse font-bold uppercase tracking-widest">
@@ -482,7 +478,7 @@ export default function FilesPage() {
         </TabsContent>
 
         <TabsContent value="shared" className="space-y-4">
-          {manualLoading && sharedBlobs.length === 0 ? (
+          {loading && sharedBlobs.length === 0 ? (
             <div className="py-20 flex flex-col items-center justify-center gap-4">
               <Loader2 className="h-10 w-10 text-accent animate-spin" />
               <p className="text-sm text-muted-foreground animate-pulse font-bold uppercase tracking-widest">
@@ -498,7 +494,7 @@ export default function FilesPage() {
             </div>
           ) : (
             <FileTable 
-              list={sharedBlobs.filter(b => b.name.toLowerCase().includes(search.toLowerCase()))} 
+              list={sharedBlobs.filter(b => b.blob_name.toLowerCase().includes(search.toLowerCase()))} 
               onDownload={(b) => {
                 setActiveSharedBlob(b);
                 setIsDecryptModalOpen(true);
@@ -518,7 +514,7 @@ export default function FilesPage() {
               Security Authorization
             </DialogTitle>
             <DialogDescription className="text-xs pt-1">
-              File <span className="text-foreground font-mono font-bold">"{activeSharedBlob?.name.split('/').pop()?.replace('.vault','')}"</span> is encrypted.
+              File <span className="text-foreground font-mono font-bold">"{activeSharedBlob?.blob_name.split('/').pop()?.replace('.vault','')}"</span> is encrypted.
             </DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-4">
@@ -548,7 +544,7 @@ export default function FilesPage() {
                 disabled={!manualKey || !!downloadingId}
                 className="bg-accent hover:bg-accent/80 text-accent-foreground rounded-lg"
             >
-                {downloadingId === activeSharedBlob?.name ? (
+                {downloadingId === activeSharedBlob?.blob_name ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 ) : (
                   <Download className="h-4 w-4 mr-2" />
@@ -568,13 +564,11 @@ const FileTable = ({
   onDelete, 
   isShared 
 }: { 
-  list: BlobMetadata[], 
-  onDownload: (b: BlobMetadata) => void, 
+  list: ShelbyBlob[], 
+  onDownload: (b: ShelbyBlob) => void, 
   onDelete?: (idx: number) => void,
   isShared?: boolean
 }) => {
-  const { account } = useWallet(); // Access account from useWallet hook
-
   return (
     <div className="glass-card overflow-hidden rounded-2xl border-border/40">
       <div className="overflow-x-auto">
@@ -590,7 +584,7 @@ const FileTable = ({
           </thead>
           <tbody>
             {list.map((b, idx) => {
-              const rawName = b.name.includes('/') ? b.name.split('/').slice(1).join('/') : b.name;
+              const rawName = b.blob_name.includes('/') ? b.blob_name.split('/').slice(1).join('/') : b.blob_name;
               const isShelbyShared = rawName.startsWith("shelbysecure/");
               const cleanName = isShelbyShared ? rawName.replace("shelbysecure/", "") : rawName; // Keep original rawName if not shelbysecure for further checks
               
@@ -603,7 +597,7 @@ const FileTable = ({
                 : cleanName;
 
               return (
-                <tr key={b.name} className="border-b border-border/20 hover:bg-muted/10 transition-colors group">
+                <tr key={b.blob_name} className="border-b border-border/20 hover:bg-muted/10 transition-colors group">
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center relative border border-primary/5">
@@ -646,7 +640,7 @@ const FileTable = ({
                     {formatBytes(b.size)}
                   </td>
                   <td className="px-5 py-3.5 text-muted-foreground hidden md:table-cell">
-                    {fromShelbyTimestamp(b.creationMicros).toLocaleDateString()}
+                    {fromShelbyTimestamp(b.created_at).toLocaleDateString()}
                   </td>
                   <td className="px-5 py-3.5">
                     <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ${isShared ? 'bg-accent/10 text-accent border border-accent/20' : 'bg-primary/10 text-primary border border-primary/20'}`}>
@@ -664,7 +658,7 @@ const FileTable = ({
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       )}
-                      <a href={`https://explorer.shelby.xyz/testnet/blobs/${account?.address.toString()}?blobName=${encodeURIComponent(rawName)}`} target="_blank" rel="noopener noreferrer">
+                      <a href={`https://explorer.shelby.xyz/testnet/blobs/${b.owner}?blobName=${encodeURIComponent(rawName)}`} target="_blank" rel="noopener noreferrer">
                         <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:bg-muted rounded-xl transition-all">
                           <ExternalLink className="h-4 w-4" />
                         </Button>

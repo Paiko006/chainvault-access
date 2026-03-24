@@ -44,18 +44,17 @@ const App = () => {
 
   // Initialize clients inside useMemo to ensure env vars are ready
   const shelbyClient = useMemo(() => new ShelbyClient({
-    network: Network.TESTNET, // Keep wallet on Testnet
+    network: Network.TESTNET,
     apiKey: shelbyApiKey,
     rpc: {
       baseUrl: "https://api.testnet.shelby.xyz/shelby",
       apiKey: shelbyApiKey,
     },
     indexer: {
-      // Specialized Shelbynet Indexer for protocol blobs
-      baseUrl: "https://api.shelbynet.shelby.xyz/v1/graphql",
-      apiKey: aptosApiKey,
+      baseUrl: "https://api.testnet.aptoslabs.com/nocode/v1/public/alias/shelby/testnet/v1/graphql",
+      apiKey: shelbyApiKey,
     }
-  }), [shelbyApiKey, aptosApiKey]);
+  }), [shelbyApiKey]);
 
   return (
     <QueryClientProvider client={queryClient}>

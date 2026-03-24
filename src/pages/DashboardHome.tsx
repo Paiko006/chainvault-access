@@ -1,34 +1,24 @@
 import { useState, useEffect } from "react";
-import { FileText, HardDrive, Share2, Clock, ExternalLink, Upload, PlugZap, Loader2, RefreshCw, Key, ShieldCheck, Copy, Eye, EyeOff, ShieldAlert, Unlock, Search } from "lucide-react";
+import { FileText, HardDrive, Share2, Clock, ExternalLink, Upload, PlugZap, Loader2, RefreshCw, Key, ShieldCheck, Copy, Eye, EyeOff, ShieldAlert, Unlock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { useAptBalance } from "@aptos-labs/react";
 import { Link } from "react-router-dom";
 import { shortenAddress } from "@/lib/wallet";
-import { formatBytes, fromShelbyTimestamp, syncUserQuota } from "@/lib/shelby-indexer";
-import { getVaultKey, normalizeAptosAddress } from "@/lib/crypto";
+import { fetchAccountBlobs, ShelbyBlob, formatBytes, fromShelbyTimestamp, syncUserQuota } from "@/lib/shelby-indexer";
+import { getVaultKey } from "@/lib/crypto";
 import { QUOTA_STORAGE_KEY, DEFAULT_QUOTA } from "@/components/landing/PricingSection";
-import { useAccountBlobs } from "@shelby-protocol/react";
-import { BlobMetadata } from "@shelby-protocol/sdk/browser";
 
 export default function DashboardHome() {
   const { connected, account, signMessage } = useWallet();
   const { data: aptBalance, isLoading: balanceLoading } = useAptBalance();
-  
-  // Official Shelby SDK hook for account assets
-  const { data: blobsRaw = [], isLoading: blobsLoading, error: blobsError } = useAccountBlobs({
-    account: account?.address.toString() || "",
-  });
-  
-  const blobs = blobsRaw as unknown as BlobMetadata[];
-  
+  const [blobs, setBlobs] = useState<ShelbyBlob[]>([]);
   const [loading, setLoading] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [showKey, setShowKey] = useState(false);
   const [vaultSeed, setVaultSeed] = useState<string | null>(null);
   const [quota, setQuota] = useState(DEFAULT_QUOTA);
-  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const stored = localStorage.getItem(QUOTA_STORAGE_KEY);
@@ -37,8 +27,7 @@ export default function DashboardHome() {
 
   useEffect(() => {
     if (account) {
-      const normalized = normalizeAptosAddress(account.address.toString());
-      const seed = localStorage.getItem(`vault_seed_${normalized}`);
+      const seed = localStorage.getItem(`vault_seed_${account.address}`);
       setVaultSeed(seed);
     }
   }, [account]);
@@ -50,9 +39,8 @@ export default function DashboardHome() {
     }
     try {
       toast.loading("Requesting signature...", { id: "unlock" });
-      const normalized = normalizeAptosAddress(account.address.toString());
-      await getVaultKey(normalized, signMessage);
-      const seed = localStorage.getItem(`vault_seed_${normalized}`);
+      await getVaultKey(account.address.toString(), signMessage);
+      const seed = localStorage.getItem(`vault_seed_${account.address.toString()}`);
       setVaultSeed(seed);
       toast.success("Vault Unlocked! 🔓", { id: "unlock" });
     } catch (err: unknown) {
@@ -60,25 +48,36 @@ export default function DashboardHome() {
     }
   };
 
-  // Effect to sync quota
   useEffect(() => {
-    async function updateQuota() {
+    async function loadData() {
       if (connected && account) {
-        const addr = account.address.toString();
-        const networkQuota = await syncUserQuota(addr);
-        if (networkQuota) {
-          setQuota(networkQuota);
-          localStorage.setItem(QUOTA_STORAGE_KEY, networkQuota.toString());
+        setLoading(true);
+        try {
+          const addr = account.address.toString();
+          
+          // 1. Cross-Device Sync: Check network for updated quota
+          const networkQuota = await syncUserQuota(addr);
+          if (networkQuota) {
+            setQuota(networkQuota);
+            localStorage.setItem(QUOTA_STORAGE_KEY, networkQuota.toString());
+          }
+
+          const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || "";
+          const data = await fetchAccountBlobs(addr, apiKey);
+          setBlobs(data);
+          setLastSync(new Date());
+        } catch (err) {
+          console.error("Failed to sync blobs:", err);
+        } finally {
+          setLoading(false);
         }
       }
     }
-    updateQuota();
+    loadData();
   }, [connected, account]);
 
-  const isLoading = loading || blobsLoading;
-
-  const totalSize = blobs.reduce((s, b) => s + (b.size || 0), 0);
-  const lastUpload = blobs[0] ? fromShelbyTimestamp(blobs[0].creationMicros).toLocaleDateString() : "—";
+  const totalSize = blobs.reduce((s, b) => s + Number(b.size), 0);
+  const lastUpload = blobs[0] ? fromShelbyTimestamp(blobs[0].created_at).toLocaleDateString() : "—";
 
   const aptDisplay = balanceLoading
     ? "…"
@@ -160,20 +159,6 @@ export default function DashboardHome() {
                 Synced
               </span>
             )}
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => {
-                // useAccountBlobs automatically refetches, but we can trigger a slight window reload 
-                // if we want to be absolutely sure all contexts (like Quota) are fresh.
-                setRefreshKey(prev => prev + 1);
-              }}
-              disabled={loading}
-              className="gap-2 h-7 rounded-lg text-[10px] font-bold uppercase"
-            >
-              <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
-              Sync Now
-            </Button>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-accent/10 border border-accent/20 px-3 py-1 text-[10px] font-bold text-accent uppercase">
               Aptos Testnet
             </span>
@@ -198,32 +183,6 @@ export default function DashboardHome() {
       </div>
 
       {/* Stats grid */}
-      {!vaultSeed && blobs.length > 0 && (
-        <div className="glass-card bg-accent/5 border-accent/20 p-5 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-6 mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-2xl bg-accent/10 flex items-center justify-center shrink-0 border border-accent/20">
-              <ShieldAlert className="h-6 w-6 text-accent animate-pulse" />
-            </div>
-
-            <div>
-              <h4 className="text-base font-bold text-foreground">Vault is Protected</h4>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Your decryption key is missing on this device. Sign to initialize full dashboard access.
-              </p>
-            </div>
-          </div>
-          <Button 
-            variant="outline" 
-            size="lg"
-            onClick={handleUnlock}
-            className="bg-accent/10 border-accent/30 hover:bg-accent/20 text-accent font-bold px-8 h-12 rounded-xl transition-all active:scale-95 shrink-0"
-          >
-            <Unlock className="h-5 w-5 mr-2" />
-            Unlock Vault
-          </Button>
-        </div>
-      )}
-
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((s) => (
           <div
@@ -241,24 +200,6 @@ export default function DashboardHome() {
           </div>
         ))}
       </div>
-
-      {!loading && blobs.length === 0 && account && (
-        <div className="mt-8 p-6 rounded-2xl border border-dashed border-border/30 bg-secondary/5 flex flex-col items-center text-center max-w-2xl mx-auto animate-in fade-in zoom-in duration-700">
-           <div className="h-10 w-10 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-             <Search className="h-5 w-5 text-muted-foreground" />
-           </div>
-           <h3 className="text-sm font-bold text-foreground">Hasil Sinkronisasi: Tidak Ada Data</h3>
-           <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-             Sistem mencari di Indexer Shelby menggunakan alamat dompet Anda namun tidak menemukan aset apapun. 
-             Jika Anda memiliki aset di perangkat lain, pastikan Anda menggunakan <strong>API Key</strong> yang sama di 
-             <Link to="/dashboard/settings" className="text-primary hover:underline"> Pengaturan</Link>.
-           </p>
-           <div className="mt-4 p-3 rounded-xl bg-black/20 border border-white/5 font-mono text-[9px] text-muted-foreground break-all max-w-full text-left space-y-1">
-             <div className="text-[8px] uppercase font-bold text-accent/50">ID Pencarian Indexer:</div>
-             <div>{normalizeAptosAddress(account.address.toString())}</div>
-           </div>
-        </div>
-      )}
 
       {/* Security & Vault Key */}
       <div className="glass-card p-6 rounded-2xl border-l-4 border-l-accent relative overflow-hidden group">
@@ -384,7 +325,7 @@ export default function DashboardHome() {
               </thead>
               <tbody>
                 {blobs.slice(0, 10).map((b, idx) => {
-                  const rawName = b.name.includes('/') ? b.name.split('/').slice(1).join('/') : b.name;
+                  const rawName = b.blob_name.includes('/') ? b.blob_name.split('/').slice(1).join('/') : b.blob_name;
                   // Handle both shelbysecure/ folder and old ENC-v1- prefix
                   const cleanName = rawName.replace("shelbysecure/", "").replace("ENC-v1-", "").replace(".vault", "");
                   
@@ -405,7 +346,7 @@ export default function DashboardHome() {
                         {formatBytes(b.size)}
                       </td>
                       <td className="px-5 py-3.5 text-muted-foreground hidden md:table-cell">
-                        {fromShelbyTimestamp(b.creationMicros).toLocaleDateString()}
+                        {fromShelbyTimestamp(b.created_at).toLocaleDateString()}
                       </td>
                       <td className="px-5 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-2">

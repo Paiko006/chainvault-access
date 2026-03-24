@@ -3,7 +3,7 @@
  * Fetches blob metadata and account statistics directly from the Shelby GraphQL Indexer.
  */
 
-const SHELBY_INDEXER_URL = "https://api.testnet.aptoslabs.com/v1/graphql";
+const SHELBY_INDEXER_URL = "https://api.testnet.aptoslabs.com/nocode/v1/public/alias/shelby/testnet/v1/graphql";
 export const PUBLIC_SHELBY_API_KEY = "AG-7FPFEZSPINUP4F7HKVSIO1ZPOEDZ8E5WN";
 
 export interface ShelbyBlob {
@@ -16,48 +16,7 @@ export interface ShelbyBlob {
 }
 
 /**
- * Normalizes an Aptos address to a full 64-character hex string (excluding 0x).
- */
-export function normalizeAptosAddress(addr: string): string {
-  let clean = addr.toLowerCase();
-  if (clean.startsWith("0x")) {
-    clean = clean.substring(2);
-  }
-  return "0x" + clean.padStart(64, "0");
-}
-
-/**
- * Helper for GraphQL fetch with error handling and API key trimming
- */
-async function performQuery(query: string, variables: any, apiKey?: string): Promise<any> {
-  const rawApiKey = apiKey || localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY || PUBLIC_SHELBY_API_KEY;
-  const effectiveApiKey = rawApiKey?.trim() || "";
-
-  try {
-    const response = await fetch(SHELBY_INDEXER_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(effectiveApiKey ? { 
-          "Authorization": `Bearer ${effectiveApiKey}`,
-          "x-api-key": effectiveApiKey 
-        } : {})
-      },
-      body: JSON.stringify({ query, variables })
-    });
-
-    if (!response.ok) return null;
-    const result = await response.json();
-    return result.data;
-  } catch (err) {
-    console.error("[ShelbyIndexer] Query error:", err);
-    return null;
-  }
-}
-
-/**
  * Fetches all active (not deleted) blobs owned by a specific address.
- * Retries with both padded and shortened address formats for maximum resilience.
  */
 export async function fetchAccountBlobs(owner: string, apiKey?: string): Promise<ShelbyBlob[]> {
   const query = `
@@ -75,22 +34,45 @@ export async function fetchAccountBlobs(owner: string, apiKey?: string): Promise
     }
   `;
 
-  // Try 1: Padded
-  const padded = normalizeAptosAddress(owner);
-  const data1 = await performQuery(query, { owner: padded }, apiKey);
-  if (data1?.blobs?.length > 0) return data1.blobs;
+  try {
+    const normalizedOwner = normalizeAptosAddress(owner);
+    const effectiveApiKey = apiKey || localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY || PUBLIC_SHELBY_API_KEY;
+    
+    console.info("[Shelby] Fetching blobs for:", normalizedOwner);
+    console.info("[Shelby] Using API Key (start):", effectiveApiKey?.slice(0, 5));
+    
+    const response = await fetch(SHELBY_INDEXER_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(effectiveApiKey ? { 
+          "Authorization": `Bearer ${effectiveApiKey}`,
+          "x-api-key": effectiveApiKey 
+        } : {})
+      },
+      body: JSON.stringify({
+        query,
+        variables: { owner: normalizedOwner }
+      })
+    });
 
-  // Try 2: Shortened
-  const shortened = "0x" + padded.substring(2).replace(/^0+/, "");
-  const finalShortened = shortened === "0x" ? "0x0" : shortened;
-  if (finalShortened !== padded) {
-    const data2 = await performQuery(query, { owner: finalShortened }, apiKey);
-    if (data2?.blobs?.length > 0) return data2.blobs;
+    if (!response.ok) {
+      throw new Error(`Indexer request failed: ${response.statusText}`);
+    }
+
+    const { data, errors } = await response.json();
+    
+    if (errors) {
+      console.error("[ShelbyIndexer] GraphQL Errors:", errors);
+      return [];
+    }
+
+    return data?.blobs || [];
+  } catch (error) {
+    console.error("[ShelbyIndexer] Fetch error:", error);
+    return [];
   }
-
-  return [];
 }
-
 /**
  * Fetches all blobs where the given address has been granted access.
  */
@@ -110,20 +92,56 @@ export async function fetchSharedBlobs(sharee: string, apiKey?: string): Promise
     }
   `;
 
-  // Try 1: Padded
-  const padded = normalizeAptosAddress(sharee);
-  const data1 = await performQuery(query, { sharee: padded }, apiKey);
-  if (data1?.blobs?.length > 0) return data1.blobs;
+  try {
+    const normalizedSharee = normalizeAptosAddress(sharee);
+    const effectiveApiKey = apiKey || localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY || PUBLIC_SHELBY_API_KEY;
+    
+    const response = await fetch(SHELBY_INDEXER_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(effectiveApiKey ? { 
+          "Authorization": `Bearer ${effectiveApiKey}`,
+          "x-api-key": effectiveApiKey 
+        } : {})
+      },
+      body: JSON.stringify({
+        query,
+        variables: { sharee: normalizedSharee }
+      })
+    });
 
-  // Try 2: Shortened
-  const shortened = "0x" + padded.substring(2).replace(/^0+/, "");
-  const finalShortened = shortened === "0x" ? "0x0" : shortened;
-  if (finalShortened !== padded) {
-    const data2 = await performQuery(query, { sharee: finalShortened }, apiKey);
-    if (data2?.blobs?.length > 0) return data2.blobs;
+    if (!response.ok) {
+      throw new Error(`Indexer request failed: ${response.statusText}`);
+    }
+
+    const { data, errors } = await response.json();
+    
+    if (errors) {
+      console.error("[ShelbyIndexer] GraphQL Errors:", errors);
+      return [];
+    }
+
+    return data?.blobs || [];
+  } catch (error) {
+    console.error("[ShelbyIndexer] Fetch shared error:", error);
+    return [];
   }
+}
 
-  return [];
+/**
+ * Normalizes an Aptos address to a full 64-character hex string (excluding 0x).
+ * This is often required by Shelby Gateway for strict path matching.
+ */
+function normalizeAptosAddress(addr: string): string {
+  let clean = addr.toLowerCase();
+  if (!clean.startsWith("0x")) {
+    clean = "0x" + clean;
+  }
+  // For Shelby/Geomi Indexer, we should use the standard 64-char hex string (padded)
+  const parts = clean.split("0x");
+  const hex = parts[1] || parts[0];
+  return "0x" + hex.padStart(64, "0");
 }
 
 /**
@@ -131,47 +149,80 @@ export async function fetchSharedBlobs(sharee: string, apiKey?: string): Promise
  */
 export async function fetchBlobData(blobName: string, owner: string): Promise<Blob> {
   const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY || PUBLIC_SHELBY_API_KEY;
-  const effectiveApiKey = apiKey?.trim() || "";
   
+  // The indexer returns blob_name as "@address/suffix". 
+  // We need to extract only the suffix for the Gateway URL.
   let cleanBlobName = blobName;
   if (cleanBlobName.includes('/')) {
     cleanBlobName = cleanBlobName.split('/').slice(1).join('/');
+  } else if (cleanBlobName.startsWith('@')) {
+    // Fallback if formatting is weird but still has @
+    const firstSlash = cleanBlobName.indexOf('/');
+    if (firstSlash !== -1) {
+       cleanBlobName = cleanBlobName.substring(firstSlash + 1);
+    }
   }
 
   const normalizedOwner = normalizeAptosAddress(owner);
+  // Gateway expects: .../blobs/{owner}/{blobNameSuffix}
+  // Important: Do NOT encode the whole suffix if it contains slashes (directory structure)
+  // Our files don't have slashes, but for generic safety we encode parts.
   const encodedName = cleanBlobName.split('/').map(p => encodeURIComponent(p)).join('/');
   const url = `https://api.testnet.shelby.xyz/shelby/v1/blobs/${normalizedOwner}/${encodedName}`;
 
-  const response = await fetch(url, {
-    headers: {
-      "Authorization": `Bearer ${effectiveApiKey}`,
-      "x-api-key": effectiveApiKey
+  const maxAttempts = 3;
+  const delayMs = 2000;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const response = await fetch(url, {
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "x-api-key": apiKey
+      }
+    });
+    if (response.ok) {
+      return await response.blob();
     }
-  });
-
-  if (!response.ok) {
-    throw new Error(`Download failed (${response.status}): ${response.statusText}`);
+    if (response.status === 404 && attempt < maxAttempts) {
+      // Might still be syncing, wait and retry
+      await new Promise(r => setTimeout(r, delayMs));
+      continue;
+    }
+    if (response.status === 404) {
+      throw new Error("File not found on Shelby network. It might still be syncing.");
+    }
+    if (response.status === 401) {
+      throw new Error("Unauthorized. Please check your API Key in Settings.");
+    }
+    throw new Error(`Network error (${response.status}): ${response.statusText}`);
   }
-  return await response.blob();
+  // Should never reach here
+  throw new Error("Failed to fetch blob after multiple attempts.");
 }
 
 /**
- * Fetches the user's storage quota from the Shelby network.
+ * Fetches the user's storage quota from the Shelby network (cross-device sync).
+ * It looks for any blobs starting with ".quota_" and picks the one with the largest value.
  */
 export async function syncUserQuota(owner: string, apiKey?: string): Promise<number | null> {
   try {
+    // 1. Fetch all blobs to find matching quota markers
     const blobs = await fetchAccountBlobs(owner, apiKey);
     const quotaBlobs = blobs.filter(b => b.blob_name.includes('.quota_'));
+    
     if (quotaBlobs.length === 0) return null;
 
+    // 2. Extract values from names (e.g., ".quota_53687091200")
     const values = quotaBlobs.map(b => {
       const parts = b.blob_name.split('.quota_');
       const val = parseInt(parts[parts.length - 1]);
       return isNaN(val) ? 0 : val;
     });
 
-    return Math.max(...values) || null;
+    // 3. Return the maximum value (highest upgrade)
+    const maxQuota = Math.max(...values);
+    return maxQuota > 0 ? maxQuota : null;
   } catch (err) {
+    console.error("[ShelbyIndexer] Sync quota error:", err);
     return null;
   }
 }
