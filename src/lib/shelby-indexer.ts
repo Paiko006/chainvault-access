@@ -41,9 +41,11 @@ export async function fetchAccountBlobs(owner: string, apiKey?: string): Promise
     const finalShortened = shortened === "0x" ? "0x0" : shortened;
     const owners = Array.from(new Set([padded, finalShortened]));
 
-    const effectiveApiKey = apiKey || localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY || PUBLIC_SHELBY_API_KEY;
+    const rawApiKey = apiKey || localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY || PUBLIC_SHELBY_API_KEY;
+    const effectiveApiKey = rawApiKey?.trim() || "";
     
     console.info("[Shelby] Fetching blobs for owners:", owners);
+    console.info("[Shelby] Effective API Key length:", effectiveApiKey.length);
     
     const response = await fetch(SHELBY_INDEXER_URL, {
       method: "POST",
@@ -71,7 +73,9 @@ export async function fetchAccountBlobs(owner: string, apiKey?: string): Promise
       return [];
     }
 
-    return data?.blobs || [];
+    const blobs = data?.blobs || [];
+    console.info(`[ShelbyIndexer] Found ${blobs.length} blobs for ${owner}`);
+    return blobs;
   } catch (error) {
     console.error("[ShelbyIndexer] Fetch error:", error);
     return [];
@@ -102,7 +106,8 @@ export async function fetchSharedBlobs(sharee: string, apiKey?: string): Promise
     const finalShortened = shortened === "0x" ? "0x0" : shortened;
     const sharees = Array.from(new Set([padded, finalShortened]));
 
-    const effectiveApiKey = apiKey || localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY || PUBLIC_SHELBY_API_KEY;
+    const rawApiKey = apiKey || localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY || PUBLIC_SHELBY_API_KEY;
+    const effectiveApiKey = rawApiKey?.trim() || "";
     
     const response = await fetch(SHELBY_INDEXER_URL, {
       method: "POST",
@@ -130,7 +135,9 @@ export async function fetchSharedBlobs(sharee: string, apiKey?: string): Promise
       return [];
     }
 
-    return data?.blobs || [];
+    const blobs = data?.blobs || [];
+    console.info(`[ShelbyIndexer] Found ${blobs.length} shared blobs for ${sharee}`);
+    return blobs;
   } catch (error) {
     console.error("[ShelbyIndexer] Fetch shared error:", error);
     return [];

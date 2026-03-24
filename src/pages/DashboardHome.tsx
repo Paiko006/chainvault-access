@@ -6,7 +6,7 @@ import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { useAptBalance } from "@aptos-labs/react";
 import { Link } from "react-router-dom";
 import { shortenAddress } from "@/lib/wallet";
-import { fetchAccountBlobs, ShelbyBlob, formatBytes, fromShelbyTimestamp, syncUserQuota } from "@/lib/shelby-indexer";
+import { fetchAccountBlobs, fetchSharedBlobs, ShelbyBlob, formatBytes, fromShelbyTimestamp, syncUserQuota } from "@/lib/shelby-indexer";
 import { getVaultKey, normalizeAptosAddress } from "@/lib/crypto";
 import { QUOTA_STORAGE_KEY, DEFAULT_QUOTA } from "@/components/landing/PricingSection";
 
@@ -19,6 +19,7 @@ export default function DashboardHome() {
   const [showKey, setShowKey] = useState(false);
   const [vaultSeed, setVaultSeed] = useState<string | null>(null);
   const [quota, setQuota] = useState(DEFAULT_QUOTA);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const stored = localStorage.getItem(QUOTA_STORAGE_KEY);
@@ -65,8 +66,12 @@ export default function DashboardHome() {
           }
 
           const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || "";
-          const data = await fetchAccountBlobs(addr, apiKey);
-          setBlobs(data);
+          const [personal, shared] = await Promise.all([
+            fetchAccountBlobs(addr, apiKey),
+            fetchSharedBlobs(addr, apiKey)
+          ]);
+          
+          setBlobs([...personal, ...shared]);
           setLastSync(new Date());
         } catch (err) {
           console.error("Failed to sync blobs:", err);
@@ -79,7 +84,7 @@ export default function DashboardHome() {
       }
     }
     loadData();
-  }, [connected, account]);
+  }, [connected, account, refreshKey]);
 
   const totalSize = blobs.reduce((s, b) => s + Number(b.size), 0);
   const lastUpload = blobs[0] ? fromShelbyTimestamp(blobs[0].created_at).toLocaleDateString() : "—";
@@ -168,10 +173,7 @@ export default function DashboardHome() {
               variant="outline" 
               size="sm" 
               onClick={() => {
-                // We don't have a direct 'loadData' we can call easily if it's in useEffect,
-                // but we can trigger a state change that re-runs the effect.
-                // For simplicity, let's just make the window reload or better, add a refresh state.
-                window.location.reload(); 
+                setRefreshKey(prev => prev + 1);
               }}
               disabled={loading}
               className="gap-2 h-7 rounded-lg text-[10px] font-bold uppercase"
