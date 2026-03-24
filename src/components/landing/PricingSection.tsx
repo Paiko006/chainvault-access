@@ -182,9 +182,9 @@ export function PricingSection() {
       
       setTimeout(() => navigate("/dashboard"), 1000);
       */
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[Pricing] Upgrade failed:", err);
-      toast.error("Upgrade failed: " + (err.message || "Transaction rejected"), { id: tid });
+      toast.error("Upgrade failed: " + (err instanceof Error ? err.message : "Transaction rejected"), { id: tid });
     }
   };
 

@@ -33,23 +33,28 @@ const SHELBY_CONTRACT = "0x85fdb9a176ab8ef1d9d9c1b60d60b3924f0800ac1de1cc2085fb0
 const REGISTRY_RESOURCE = `${SHELBY_CONTRACT}::storage_provider_registry::StorageProviders`;
 
 // Recursive function to deeply collect all 'entries' from any BPlusTree structure
-function collectAllEntries(obj: any, allEntries: any[] = []): any[] {
+function collectAllEntries(obj: unknown, allEntries: unknown[] = []): unknown[] {
   if (!obj || typeof obj !== 'object') return allEntries;
   
+  const record = obj as Record<string, unknown>;
+
   // If we found an entries array, add its contents
-  if (Array.isArray(obj.entries)) {
-    allEntries.push(...obj.entries);
+  if (Array.isArray(record.entries)) {
+    allEntries.push(...record.entries);
   }
   
   // Also check for the common BPlusTree variant pattern where entries are inside a value
-  if (obj.value && Array.isArray(obj.value.entries)) {
-    allEntries.push(...obj.value.entries);
+  if (record.value && typeof record.value === 'object') {
+    const valueRecord = record.value as Record<string, unknown>;
+    if (Array.isArray(valueRecord.entries)) {
+      allEntries.push(...valueRecord.entries);
+    }
   }
 
   // Recurse into all object properties to find more entries
-  for (const key in obj) {
-    if (obj[key] && typeof obj[key] === 'object' && key !== 'entries') {
-      collectAllEntries(obj[key], allEntries);
+  for (const key in record) {
+    if (record[key] && typeof record[key] === 'object' && key !== 'entries') {
+      collectAllEntries(record[key], allEntries);
     }
   }
   
@@ -72,11 +77,13 @@ export async function fetchStorageProviders(): Promise<StorageProvider[]> {
     const shellData = resourceResult?.data || resourceResult;
     const activeProvidersList = collectAllEntries(shellData);
     
-    activeProvidersList.forEach((entry: any) => {
-      if (!entry || typeof entry !== 'object' || !entry.key) return;
+    activeProvidersList.forEach((entry: unknown) => {
+      if (!entry || typeof entry !== 'object' || !('key' in entry)) return;
       
-      const name = entry.key;
-      const value = entry.value?.value || entry.value;
+      const safeEntry = entry as Record<string, unknown>;
+      const name = safeEntry.key as string;
+      const entryValue = safeEntry.value as Record<string, unknown>;
+      const value = entryValue?.value || entryValue;
       const details = Array.isArray(value) ? value[0] : value;
       
       // Determine the address: use explicit field if available, fallback to entry key if it looks like an address

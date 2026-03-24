@@ -43,8 +43,8 @@ export default function DashboardHome() {
       const seed = localStorage.getItem(`vault_seed_${account.address.toString()}`);
       setVaultSeed(seed);
       toast.success("Vault Unlocked! 🔓", { id: "unlock" });
-    } catch (err: any) {
-      toast.error(err.message || "Failed to unlock vault", { id: "unlock" });
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to unlock vault", { id: "unlock" });
     }
   };
 

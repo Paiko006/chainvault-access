@@ -11,7 +11,7 @@ const KEY_USAGE: KeyUsage[] = ["encrypt", "decrypt"];
  * Gets or creates a unique encryption key for the given wallet address.
  * Stores a random seed in localStorage to ensure persistence across sessions.
  */
-export async function getVaultKey(addressOrSeed: string, signMessage?: (payload: any) => Promise<any>): Promise<CryptoKey> {
+export async function getVaultKey(addressOrSeed: string, signMessage?: (payload: unknown) => Promise<unknown>): Promise<CryptoKey> {
   let seedBase64: string | null = null;
   const isDirectSeed = addressOrSeed.length > 40 && !addressOrSeed.startsWith("0x");
 
@@ -27,7 +27,7 @@ export async function getVaultKey(addressOrSeed: string, signMessage?: (payload:
           const response = await signMessage({
             message: "Welcome to ShelbySecure!\n\nSign this message to securely unlock your decentralized data vault and generate your encryption key.\n\nThis request will not trigger a blockchain transaction or cost any gas fees.",
             nonce: "1",
-          });
+          }) as { signature?: string, fullMessage?: string };
           
           // Hash the signature to derive 32 bytes of entropy for the seed
           const sigData = new TextEncoder().encode(response.signature || response.fullMessage || "fallback-sig-entropy");
@@ -35,7 +35,7 @@ export async function getVaultKey(addressOrSeed: string, signMessage?: (payload:
           
           seedBase64 = btoa(String.fromCharCode(...new Uint8Array(hashBuffer)));
           localStorage.setItem(storageKey, seedBase64);
-        } catch (err: any) {
+        } catch (err: unknown) {
           throw new Error("Vault signature required. Please approve the signing request to unlock.");
         }
       } else {

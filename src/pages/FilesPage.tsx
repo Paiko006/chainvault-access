@@ -156,9 +156,9 @@ export default function FilesPage() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[ChainVault] Download/Decrypt error:", err);
-      const errorMsg = err?.message || "Check your vault key or internet connection.";
+      const errorMsg = err instanceof Error ? err.message : "Check your vault key or internet connection.";
       toast.error(`Error: ${errorMsg}`, { id: "dl-toast" });
     } finally {
       setDownloadingId(null);
@@ -202,7 +202,7 @@ export default function FilesPage() {
       document.body.removeChild(a);
       
       setManualKey("");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[ChainVault] Shared Download error:", err);
       toast.error("Decryption failed. Please verify the owner's vault key.", { id: "dl-shared-toast" });
     } finally {
@@ -220,9 +220,9 @@ export default function FilesPage() {
       });
       setRefresh((r) => r + 1);
     },
-    onError: (err: any) => {
+    onError: (err: unknown) => {
       console.error("[ChainVault] Delete error:", err);
-      toast.error("Failed to delete from Shelby: " + (err?.message || "Unknown error"));
+      toast.error("Failed to delete from Shelby: " + (err instanceof Error ? err.message : "Unknown error"));
     }
   });
 

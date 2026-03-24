@@ -21,8 +21,8 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
       await connect(walletName);
       toast.success(`Wallet connection initiated...`);
       onClose();
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to connect wallet");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to connect wallet");
     } finally {
       setConnecting(null);
     }
@@ -91,7 +91,7 @@ export function ConnectWalletModal({ open, onClose }: ConnectWalletModalProps) {
                     </a>
                   </div>
                 ) : (
-                  wallets.map((w: any) => {
+                  wallets.map((w: { name: string; icon?: string }) => {
                     const walletName = w.name;
                     const walletIcon = w.icon;
                     const isConnecting = connecting === walletName;

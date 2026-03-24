@@ -142,7 +142,7 @@ export default function UploadPage() {
 
       const vaultKey = await getVaultKey(account.address.toString(), signMessage);
       const provider = await createDefaultErasureCodingProvider();
-      const preparedBlobs: { safeName: string; data: Uint8Array; commitments: any; numChunksets: number; originalSize: number }[] = [];
+      const preparedBlobs: { safeName: string; data: Uint8Array; commitments: { blob_merkle_root: Uint8Array }; numChunksets: number; originalSize: number }[] = [];
 
       for (const file of files) {
         setUploadProgress(`Encrypting: ${file.name}...`);
@@ -216,7 +216,7 @@ export default function UploadPage() {
                 });
                 console.log(`[ChainVault] RPC PUT success for ${b.safeName}:`, res);
                 return;
-              } catch (err: any) {
+              } catch (err: unknown) {
                 console.warn(`[ChainVault] RPC PUT attempt ${i + 1} failed for ${b.safeName}:`, err);
                 if (i === attempts - 1) throw err;
                 await new Promise(r => setTimeout(r, 3000 * (i + 1)));
@@ -253,16 +253,17 @@ export default function UploadPage() {
       setWallets([""]);
       setIsUploading(false);
       setUploadProgress("");
-    } catch (err: any) {
+    } catch (err: unknown) {
       setIsEncrypting(false);
       setIsUploading(false);
       setUploadProgress("");
       console.error("[ChainVault] Batch Upload Error:", err);
-      toast.error("Upload failed: " + (err.message || "Unknown error"));
+      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      toast.error("Upload failed: " + errorMessage);
       
       addNotification({
         title: "Upload Failed",
-        description: err.message || "An error occurred during the upload process.",
+        description: errorMessage,
         type: "error"
       });
     }

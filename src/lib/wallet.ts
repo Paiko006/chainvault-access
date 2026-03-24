@@ -6,6 +6,25 @@ export function shortenAddress(addr: string | undefined | null) {
 
 import { create } from "zustand";
 
+interface CustomWindow extends Window {
+  ethereum?: {
+    isMetaMask?: boolean;
+    request: (args: { method: string }) => Promise<string[]>;
+  };
+  aptos?: {
+    connect: () => Promise<{ address: string }>;
+  };
+  martian?: {
+    connect: () => Promise<{ address: string }>;
+  };
+  pontem?: {
+    connect: () => Promise<{ address: string }>;
+  };
+  okxwallet?: {
+    request: (args: { method: string }) => Promise<string[]>;
+  };
+}
+
 export interface WalletInfo {
   name: string;
   address: string;
@@ -26,12 +45,12 @@ export const WALLET_PROVIDERS = [
     name: "MetaMask",
     icon: "🦊",
     color: "from-orange-500 to-amber-500",
-    detect: () => typeof window !== "undefined" && !!(window as any).ethereum?.isMetaMask,
+    detect: () => typeof window !== "undefined" && !!(window as unknown as CustomWindow).ethereum?.isMetaMask,
     connect: async () => {
-      const eth = (window as any).ethereum;
+      const eth = (window as unknown as CustomWindow).ethereum;
       if (!eth?.isMetaMask) throw new Error("MetaMask not installed");
       const accounts = await eth.request({ method: "eth_requestAccounts" });
-      return accounts[0] as string;
+      return accounts[0];
     },
   },
   {
@@ -39,12 +58,12 @@ export const WALLET_PROVIDERS = [
     name: "Petra Wallet",
     icon: "🔴",
     color: "from-red-500 to-rose-500",
-    detect: () => typeof window !== "undefined" && !!(window as any).aptos,
+    detect: () => typeof window !== "undefined" && !!(window as unknown as CustomWindow).aptos,
     connect: async () => {
-      const aptos = (window as any).aptos;
+      const aptos = (window as unknown as CustomWindow).aptos;
       if (!aptos) throw new Error("Petra Wallet not installed");
       const res = await aptos.connect();
-      return res.address as string;
+      return res.address;
     },
   },
   {
@@ -52,12 +71,12 @@ export const WALLET_PROVIDERS = [
     name: "Martian Wallet",
     icon: "👽",
     color: "from-emerald-500 to-teal-500",
-    detect: () => typeof window !== "undefined" && !!(window as any).martian,
+    detect: () => typeof window !== "undefined" && !!(window as unknown as CustomWindow).martian,
     connect: async () => {
-      const martian = (window as any).martian;
+      const martian = (window as unknown as CustomWindow).martian;
       if (!martian) throw new Error("Martian Wallet not installed");
       const res = await martian.connect();
-      return res.address as string;
+      return res.address;
     },
   },
   {
@@ -65,12 +84,12 @@ export const WALLET_PROVIDERS = [
     name: "Pontem Wallet",
     icon: "🟣",
     color: "from-violet-500 to-purple-500",
-    detect: () => typeof window !== "undefined" && !!(window as any).pontem,
+    detect: () => typeof window !== "undefined" && !!(window as unknown as CustomWindow).pontem,
     connect: async () => {
-      const pontem = (window as any).pontem;
+      const pontem = (window as unknown as CustomWindow).pontem;
       if (!pontem) throw new Error("Pontem Wallet not installed");
       const res = await pontem.connect();
-      return res.address as string;
+      return res.address;
     },
   },
   {
@@ -78,12 +97,12 @@ export const WALLET_PROVIDERS = [
     name: "OKX Wallet",
     icon: "⚫",
     color: "from-zinc-400 to-zinc-600",
-    detect: () => typeof window !== "undefined" && !!(window as any).okxwallet,
+    detect: () => typeof window !== "undefined" && !!(window as unknown as CustomWindow).okxwallet,
     connect: async () => {
-      const okx = (window as any).okxwallet;
+      const okx = (window as unknown as CustomWindow).okxwallet;
       if (!okx) throw new Error("OKX Wallet not installed");
       const accounts = await okx.request({ method: "eth_requestAccounts" });
-      return accounts[0] as string;
+      return accounts[0];
     },
   },
 ];

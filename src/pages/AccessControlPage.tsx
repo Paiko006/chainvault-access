@@ -86,9 +86,9 @@ export default function AccessControlPage() {
 
       toast.success(`Access granted on-chain to ${newWallet.slice(0, 6)}...`);
       setNewWallet("");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[ChainVault] Add Permission Error:", err);
-      toast.error("Failed to share access on blockchain: " + (err.message || "User rejected"));
+      toast.error("Failed to share access on blockchain: " + (err instanceof Error ? err.message : "User rejected"));
     } finally {
       setIsProcessing(null);
     }
@@ -119,9 +119,9 @@ export default function AccessControlPage() {
       }
 
       toast.success("Access revoked on-chain.");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[ChainVault] Revoke Permission Error:", err);
-      toast.error("Failed to revoke access: " + (err.message || "User rejected"));
+      toast.error("Failed to revoke access: " + (err instanceof Error ? err.message : "User rejected"));
     } finally {
       setIsProcessing(null);
     }
