@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { Upload, X, Plus, FileText, Loader2, ExternalLink, HardDrive } from "lucide-react";
+import { Upload, X, Plus, FileText, Loader2, ExternalLink, HardDrive, Unlock, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
@@ -41,6 +41,7 @@ export default function UploadPage() {
   const expirationMicros = (Date.now() + 1 * 365 * 24 * 60 * 60 * 1000) * 1000; // 1 year from now
 
   const [isUploading, setIsUploading] = useState(false);
+  const [isVaultLocked, setIsVaultLocked] = useState(true);
   const [uploadProgress, setUploadProgress] = useState("");
   const [usedBytes, setUsedBytes] = useState(0);
   const [loadingUsed, setLoadingUsed] = useState(false);
@@ -51,6 +52,30 @@ export default function UploadPage() {
     const stored = localStorage.getItem(QUOTA_STORAGE_KEY);
     if (stored) setQuota(parseInt(stored));
   }, []);
+
+  useEffect(() => {
+    if (account) {
+      const storageKey = `vault_seed_${account.address.toString()}`;
+      const seed = localStorage.getItem(storageKey);
+      setIsVaultLocked(!seed);
+    }
+  }, [account]);
+
+  const handleUnlockOnly = async () => {
+    if (!account || !signMessage) return;
+    try {
+      setUploadProgress("Unlocking Vault...");
+      setIsEncrypting(true);
+      await getVaultKey(account.address.toString(), signMessage);
+      setIsVaultLocked(false);
+      toast.success("Vault Unlocked successfully! 🔓");
+    } catch (err: unknown) {
+      toast.error("Unlock failed. Signature is required to access your private vault.");
+    } finally {
+      setIsEncrypting(false);
+      setUploadProgress("");
+    }
+  };
 
   useEffect(() => {
     async function checkQuota() {
@@ -142,7 +167,7 @@ export default function UploadPage() {
 
       const vaultKey = await getVaultKey(account.address.toString(), signMessage);
       const provider = await createDefaultErasureCodingProvider();
-      const preparedBlobs: { safeName: string; data: Uint8Array; commitments: { blob_merkle_root: Uint8Array }; numChunksets: number; originalSize: number }[] = [];
+      const preparedBlobs: { safeName: string; data: Uint8Array; commitments: { blob_merkle_root: string }; numChunksets: number; originalSize: number }[] = [];
 
       for (const file of files) {
         setUploadProgress(`Encrypting: ${file.name}...`);
@@ -401,27 +426,51 @@ export default function UploadPage() {
         </Button>
       </div>
 
-      <Button
-        variant="hero"
-        size="lg"
-        className="w-full rounded-xl py-6"
-        disabled={files.length === 0 || !connected || isUploading || isEncrypting}
-        onClick={handleUpload}
-      >
-        {isEncrypting || isUploading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            {uploadProgress}
-          </>
-        ) : !connected ? (
-          "Connect Wallet to Upload"
-        ) : (
-          <>
-            <Upload className="mr-2 h-4 w-4" />
-            Sign & Secure {files.length} File{files.length > 1 ? 's' : ''}
-          </>
-        )}
-      </Button>
+      {isVaultLocked && connected ? (
+        <Button
+          variant="outline"
+          size="lg"
+          className="w-full rounded-xl py-6 border-accent/50 hover:bg-accent/10 hover:border-accent text-accent font-bold gap-2 group"
+          disabled={isEncrypting}
+          onClick={handleUnlockOnly}
+        >
+          {isEncrypting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Unlock className="h-4 w-4 group-hover:scale-110 transition-transform" />
+          )}
+          Unlock Vault to Secure Files
+        </Button>
+      ) : (
+        <Button
+          variant="hero"
+          size="lg"
+          className="w-full rounded-xl py-6"
+          disabled={files.length === 0 || !connected || isUploading || isEncrypting}
+          onClick={handleUpload}
+        >
+          {isEncrypting || isUploading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              {uploadProgress}
+            </>
+          ) : !connected ? (
+            "Connect Wallet to Upload"
+          ) : (
+            <>
+              <Upload className="mr-2 h-4 w-4" />
+              Sign & Secure {files.length} File{files.length > 1 ? 's' : ''}
+            </>
+          )}
+        </Button>
+      )}
+
+      {isVaultLocked && connected && (
+        <p className="text-[10px] text-center text-muted-foreground flex items-center justify-center gap-1.5 opacity-80 uppercase tracking-tighter font-bold">
+          <ShieldCheck className="h-3 w-3 text-accent" />
+          Decryption seed missing on this device. Sign once to initialize.
+        </p>
+      )}
 
       {(isUploading || isEncrypting) && (
         <div className="space-y-2">
