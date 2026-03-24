@@ -353,7 +353,7 @@ export default function DashboardHome() {
                       <td className="px-5 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <a 
-                            href={`https://explorer.shelby.xyz/testnet/blobs/${b.owner}?blobName=${encodeURIComponent(rawName)}`}
+                            href={`https://explorer.shelby.xyz/testnet/blobs/${b.owner}/${encodeURIComponent(b.blob_name)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                           >

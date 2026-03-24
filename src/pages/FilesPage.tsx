@@ -658,7 +658,7 @@ const FileTable = ({
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       )}
-                      <a href={`https://explorer.shelby.xyz/testnet/blobs/${b.owner}?blobName=${encodeURIComponent(rawName)}`} target="_blank" rel="noopener noreferrer">
+                      <a href={`https://explorer.shelby.xyz/testnet/blobs/${b.owner}/${encodeURIComponent(b.blob_name)}`} target="_blank" rel="noopener noreferrer">
                         <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:bg-muted rounded-xl transition-all">
                           <ExternalLink className="h-4 w-4" />
                         </Button>
