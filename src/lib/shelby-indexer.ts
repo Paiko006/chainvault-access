@@ -12,6 +12,7 @@ export interface ShelbyBlob {
   created_at: string; // numeric string (microseconds)
   expires_at: string; // numeric string (microseconds)
   owner: string;
+  permissions?: { sharee: string }[];
 }
 
 /**
@@ -26,6 +27,9 @@ export async function fetchAccountBlobs(owner: string, apiKey?: string): Promise
         created_at
         expires_at
         owner
+        permissions {
+          sharee
+        }
       }
     }
   `;
@@ -81,6 +85,9 @@ export async function fetchSharedBlobs(sharee: string, apiKey?: string): Promise
         created_at
         expires_at
         owner
+        permissions {
+          sharee
+        }
       }
     }
   `;
