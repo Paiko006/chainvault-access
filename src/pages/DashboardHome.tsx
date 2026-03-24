@@ -7,7 +7,7 @@ import { useAptBalance } from "@aptos-labs/react";
 import { Link } from "react-router-dom";
 import { shortenAddress } from "@/lib/wallet";
 import { fetchAccountBlobs, ShelbyBlob, formatBytes, fromShelbyTimestamp, syncUserQuota } from "@/lib/shelby-indexer";
-import { getVaultKey } from "@/lib/crypto";
+import { getVaultKey, normalizeAptosAddress } from "@/lib/crypto";
 import { QUOTA_STORAGE_KEY, DEFAULT_QUOTA } from "@/components/landing/PricingSection";
 
 export default function DashboardHome() {
@@ -27,7 +27,8 @@ export default function DashboardHome() {
 
   useEffect(() => {
     if (account) {
-      const seed = localStorage.getItem(`vault_seed_${account.address}`);
+      const normalized = normalizeAptosAddress(account.address.toString());
+      const seed = localStorage.getItem(`vault_seed_${normalized}`);
       setVaultSeed(seed);
     }
   }, [account]);
@@ -39,8 +40,9 @@ export default function DashboardHome() {
     }
     try {
       toast.loading("Requesting signature...", { id: "unlock" });
-      await getVaultKey(account.address.toString(), signMessage);
-      const seed = localStorage.getItem(`vault_seed_${account.address.toString()}`);
+      const normalized = normalizeAptosAddress(account.address.toString());
+      await getVaultKey(normalized, signMessage);
+      const seed = localStorage.getItem(`vault_seed_${normalized}`);
       setVaultSeed(seed);
       toast.success("Vault Unlocked! 🔓", { id: "unlock" });
     } catch (err: unknown) {
@@ -53,7 +55,7 @@ export default function DashboardHome() {
       if (connected && account) {
         setLoading(true);
         try {
-          const addr = account.address.toString();
+          const addr = normalizeAptosAddress(account.address.toString());
           
           // 1. Cross-Device Sync: Check network for updated quota
           const networkQuota = await syncUserQuota(addr);
@@ -183,6 +185,31 @@ export default function DashboardHome() {
       </div>
 
       {/* Stats grid */}
+      {!vaultSeed && blobs.length > 0 && (
+        <div className="glass-card bg-accent/5 border-accent/20 p-5 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-6 mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="flex items-center gap-4">
+            <div className="h-12 w-12 rounded-2xl bg-accent/10 flex items-center justify-center shrink-0 border border-accent/20">
+              <ShieldAlert className="h-6 w-6 text-accent animate-pulse" />
+            </div>
+            <div>
+              <h4 className="text-base font-bold text-foreground">Vault is Protected</h4>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Your decryption key is missing on this device. Sign to initialize full dashboard access.
+              </p>
+            </div>
+          </div>
+          <Button 
+            variant="outline" 
+            size="lg"
+            onClick={handleUnlock}
+            className="bg-accent/10 border-accent/30 hover:bg-accent/20 text-accent font-bold px-8 h-12 rounded-xl transition-all active:scale-95 shrink-0"
+          >
+            <Unlock className="h-5 w-5 mr-2" />
+            Unlock Vault
+          </Button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((s) => (
           <div
