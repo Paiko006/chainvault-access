@@ -19,7 +19,9 @@ import {
   Clock,
   Database,
   Eye,
-  HardDrive
+  HardDrive,
+  Unlock,
+  ShieldAlert
 } from "lucide-react";
 import { useDeleteBlobs } from "@shelby-protocol/react";
 import { toast } from "sonner";
@@ -63,12 +65,33 @@ export default function FilesPage() {
   const [loading, setLoading] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [isVaultLocked, setIsVaultLocked] = useState(true);
   const [quota, setQuota] = useState(DEFAULT_QUOTA);
 
   useEffect(() => {
     const stored = localStorage.getItem(QUOTA_STORAGE_KEY);
     if (stored) setQuota(parseInt(stored));
   }, []);
+
+  useEffect(() => {
+    if (account) {
+      const storageKey = `vault_seed_${account.address.toString()}`;
+      const seed = localStorage.getItem(storageKey);
+      setIsVaultLocked(!seed);
+    }
+  }, [account]);
+
+  const handleUnlockVault = async () => {
+    if (!account || !signMessage) return;
+    try {
+      toast.loading("Unlocking Vault...", { id: "unlock-toast" });
+      await getVaultKey(account.address.toString(), signMessage);
+      setIsVaultLocked(false);
+      toast.success("Vault Unlocked! You can now download and decrypt your files. 🔓", { id: "unlock-toast" });
+    } catch (err: unknown) {
+      toast.error("Unlock failed. Signature is required to access your private vault.", { id: "unlock-toast" });
+    }
+  };
 
   // Decryption Modal State
   const [isDecryptModalOpen, setIsDecryptModalOpen] = useState(false);
@@ -116,6 +139,14 @@ export default function FilesPage() {
       toast.error("Please connect your wallet first");
       return;
     }
+
+    if (isVaultLocked) {
+      toast.error("Vault is locked on this device. Please click 'Unlock Vault' at the top of the list first.", {
+        description: "Your personal signature is needed to decrypt your secure files.",
+      });
+      return;
+    }
+
     setDownloadingId(b.blob_name);
     try {
       // Indexer returns "@address/suffix". Strip prefix for logic.
@@ -402,6 +433,31 @@ export default function FilesPage() {
         </TabsList>
 
         <TabsContent value="my-vault" className="space-y-4">
+          {isVaultLocked && connected && blobs.length > 0 && (
+            <div className="glass-card bg-accent/5 border-accent/20 p-4 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4 mb-4 animate-in fade-in slide-in-from-top-4 duration-500">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-accent/10 flex items-center justify-center shrink-0">
+                  <ShieldAlert className="h-5 w-5 text-accent" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-foreground">Vault is Protected</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Your decryption key is missing on this device. Sign to initialize access.
+                  </p>
+                </div>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleUnlockVault}
+                className="border-accent/50 hover:bg-accent/10 hover:border-accent text-accent font-bold gap-2 shrink-0 h-10 px-4"
+              >
+                <Unlock className="h-3.5 w-3.5" />
+                Unlock Vault
+              </Button>
+            </div>
+          )}
+
           {loading && blobs.length === 0 ? (
             <div className="py-20 flex flex-col items-center justify-center gap-4">
               <Loader2 className="h-10 w-10 text-primary animate-spin" />
