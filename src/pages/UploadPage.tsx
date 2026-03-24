@@ -26,7 +26,7 @@ function saveToLocalStorage(blob: StoredBlob) {
   }
 }
 
-import { getVaultKey, encryptData, ENCRYPTION_PREFIX } from "@/lib/crypto";
+import { getVaultKey, encryptData, ENCRYPTION_PREFIX, normalizeAptosAddress } from "@/lib/crypto";
 import { PUBLIC_SHELBY_API_KEY, fetchAccountBlobs, formatBytes, syncUserQuota } from "@/lib/shelby-indexer";
 import { QUOTA_STORAGE_KEY, DEFAULT_QUOTA } from "@/components/landing/PricingSection";
 
@@ -55,7 +55,7 @@ export default function UploadPage() {
 
   useEffect(() => {
     if (account) {
-      const storageKey = `vault_seed_${account.address.toString()}`;
+      const storageKey = `vault_seed_${normalizeAptosAddress(account.address.toString())}`;
       const seed = localStorage.getItem(storageKey);
       setIsVaultLocked(!seed);
     }

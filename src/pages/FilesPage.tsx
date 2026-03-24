@@ -39,7 +39,7 @@ import {
   syncUserQuota 
 } from "@/lib/shelby-indexer";
 import { shortenAddress } from "@/lib/wallet";
-import { getVaultKey, decryptData, ENCRYPTION_PREFIX } from "@/lib/crypto";
+import { getVaultKey, decryptData, ENCRYPTION_PREFIX, normalizeAptosAddress } from "@/lib/crypto";
 import { useNotifications } from "@/hooks/use-notifications";
 import { QUOTA_STORAGE_KEY, DEFAULT_QUOTA } from "@/components/landing/PricingSection";
 import { 
@@ -75,7 +75,7 @@ export default function FilesPage() {
 
   useEffect(() => {
     if (account) {
-      const storageKey = `vault_seed_${account.address.toString()}`;
+      const storageKey = `vault_seed_${normalizeAptosAddress(account.address.toString())}`;
       const seed = localStorage.getItem(storageKey);
       setIsVaultLocked(!seed);
     }

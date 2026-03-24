@@ -8,17 +8,29 @@ const IV_LENGTH = 12; // Standard for AES-GCM
 const KEY_USAGE: KeyUsage[] = ["encrypt", "decrypt"];
 
 /**
+ * Normalizes an Aptos address to a full 64-character hex string (excluding 0x).
+ */
+export function normalizeAptosAddress(addr: string): string {
+  let clean = addr.toLowerCase();
+  if (clean.startsWith("0x")) {
+    clean = clean.substring(2);
+  }
+  return "0x" + clean.padStart(64, "0");
+}
+
+/**
  * Gets or creates a unique encryption key for the given wallet address.
  * Stores a random seed in localStorage to ensure persistence across sessions.
  */
 export async function getVaultKey(addressOrSeed: string, signMessage?: (payload: unknown) => Promise<unknown>): Promise<CryptoKey> {
+  const normalizedInput = addressOrSeed.startsWith("0x") ? normalizeAptosAddress(addressOrSeed) : addressOrSeed;
   let seedBase64: string | null = null;
-  const isDirectSeed = addressOrSeed.length > 40 && !addressOrSeed.startsWith("0x");
+  const isDirectSeed = normalizedInput.length > 40 && !normalizedInput.startsWith("0x");
 
   if (isDirectSeed) {
     seedBase64 = addressOrSeed;
   } else {
-    const storageKey = `vault_seed_${addressOrSeed}`;
+    const storageKey = `vault_seed_${normalizedInput}`;
     seedBase64 = localStorage.getItem(storageKey);
 
     if (!seedBase64) {
@@ -30,7 +42,12 @@ export async function getVaultKey(addressOrSeed: string, signMessage?: (payload:
           }) as { signature?: string, fullMessage?: string };
           
           // Hash the signature to derive 32 bytes of entropy for the seed
-          const sigData = new TextEncoder().encode(response.signature || response.fullMessage || "fallback-sig-entropy");
+          // Ensure we handle both string (hex) and Uint8Array signatures consistently
+          const rawSig = response.signature || response.fullMessage || "fallback-sig-entropy";
+          const sigData = typeof rawSig === "string" 
+            ? new TextEncoder().encode(rawSig.toLowerCase()) // Normalize hex strings to lowercase
+            : new Uint8Array(rawSig as ArrayBuffer);
+            
           const hashBuffer = await window.crypto.subtle.digest("SHA-256", sigData);
           
           seedBase64 = btoa(String.fromCharCode(...new Uint8Array(hashBuffer)));
@@ -63,7 +80,7 @@ export async function getVaultKey(addressOrSeed: string, signMessage?: (payload:
   return await window.crypto.subtle.deriveKey(
     {
       name: "PBKDF2",
-      salt: new TextEncoder().encode(isDirectSeed ? "shared_vault" : addressOrSeed), // Use generic salt for direct seeds
+      salt: new TextEncoder().encode(isDirectSeed ? "shared_vault" : normalizedInput), // Use generic salt for direct seeds
       iterations: 100000,
       hash: "SHA-256",
     },
