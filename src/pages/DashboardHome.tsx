@@ -7,7 +7,7 @@ import { useAptBalance } from "@aptos-labs/react";
 import { Link } from "react-router-dom";
 import { shortenAddress } from "@/lib/wallet";
 import { fetchAccountBlobs, ShelbyBlob, formatBytes, fromShelbyTimestamp, syncUserQuota } from "@/lib/shelby-indexer";
-import { getVaultKey } from "@/lib/crypto";
+import { getVaultKey, normalizeAptosAddress } from "@/lib/crypto";
 import { QUOTA_STORAGE_KEY, DEFAULT_QUOTA } from "@/components/landing/PricingSection";
 
 export default function DashboardHome() {
@@ -27,7 +27,8 @@ export default function DashboardHome() {
 
   useEffect(() => {
     if (account) {
-      const seed = localStorage.getItem(`vault_seed_${account.address}`);
+      const storageKey = `vault_seed_${normalizeAptosAddress(account.address.toString())}`;
+      const seed = localStorage.getItem(storageKey);
       setVaultSeed(seed);
     }
   }, [account]);
@@ -40,7 +41,8 @@ export default function DashboardHome() {
     try {
       toast.loading("Requesting signature...", { id: "unlock" });
       await getVaultKey(account.address.toString(), signMessage);
-      const seed = localStorage.getItem(`vault_seed_${account.address.toString()}`);
+      const storageKey = `vault_seed_${normalizeAptosAddress(account.address.toString())}`;
+      const seed = localStorage.getItem(storageKey);
       setVaultSeed(seed);
       toast.success("Vault Unlocked! 🔓", { id: "unlock" });
     } catch (err: unknown) {
