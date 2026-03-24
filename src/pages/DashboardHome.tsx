@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FileText, HardDrive, Share2, Clock, ExternalLink, Upload, PlugZap, Loader2, RefreshCw, Key, ShieldCheck, Copy, Eye, EyeOff, ShieldAlert, Unlock } from "lucide-react";
+import { FileText, HardDrive, Share2, Clock, ExternalLink, Upload, PlugZap, Loader2, RefreshCw, Key, ShieldCheck, Copy, Eye, EyeOff, ShieldAlert, Unlock, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
@@ -56,7 +56,7 @@ export default function DashboardHome() {
       if (connected && account) {
         setLoading(true);
         try {
-          const addr = normalizeAptosAddress(account.address.toString());
+          const addr = account.address.toString();
           
           // 1. Cross-Device Sync: Check network for updated quota
           const networkQuota = await syncUserQuota(addr);
@@ -66,6 +66,8 @@ export default function DashboardHome() {
           }
 
           const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || "";
+          
+          // 2. Fetch both personal and shared blobs for a complete dashboard
           const [personal, shared] = await Promise.all([
             fetchAccountBlobs(addr, apiKey),
             fetchSharedBlobs(addr, apiKey)
@@ -75,8 +77,8 @@ export default function DashboardHome() {
           setLastSync(new Date());
         } catch (err) {
           console.error("Failed to sync blobs:", err);
-          toast.error("Sync failed: Could not retrieve data from Shelby Indexer.", {
-            description: "Check your internet connection or API key settings."
+          toast.error("Cloud Sync Failed", {
+             description: "We couldn't reach the Shelby Indexer. Showing local data only."
           });
         } finally {
           setLoading(false);
@@ -211,6 +213,7 @@ export default function DashboardHome() {
             <div className="h-12 w-12 rounded-2xl bg-accent/10 flex items-center justify-center shrink-0 border border-accent/20">
               <ShieldAlert className="h-6 w-6 text-accent animate-pulse" />
             </div>
+
             <div>
               <h4 className="text-base font-bold text-foreground">Vault is Protected</h4>
               <p className="text-sm text-muted-foreground mt-0.5">
@@ -247,6 +250,24 @@ export default function DashboardHome() {
           </div>
         ))}
       </div>
+
+      {!loading && blobs.length === 0 && account && (
+        <div className="mt-8 p-6 rounded-2xl border border-dashed border-border/30 bg-secondary/5 flex flex-col items-center text-center max-w-2xl mx-auto animate-in fade-in zoom-in duration-700">
+           <div className="h-10 w-10 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+             <Search className="h-5 w-5 text-muted-foreground" />
+           </div>
+           <h3 className="text-sm font-bold text-foreground">Hasil Sinkronisasi: Tidak Ada Data</h3>
+           <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+             Sistem mencari di Indexer Shelby menggunakan alamat dompet Anda namun tidak menemukan aset apapun. 
+             Jika Anda memiliki aset di perangkat lain, pastikan Anda menggunakan <strong>API Key</strong> yang sama di 
+             <Link to="/dashboard/settings" className="text-primary hover:underline"> Pengaturan</Link>.
+           </p>
+           <div className="mt-4 p-3 rounded-xl bg-black/20 border border-white/5 font-mono text-[9px] text-muted-foreground break-all max-w-full text-left space-y-1">
+             <div className="text-[8px] uppercase font-bold text-accent/50">ID Pencarian Indexer:</div>
+             <div>{normalizeAptosAddress(account.address.toString())}</div>
+           </div>
+        </div>
+      )}
 
       {/* Security & Vault Key */}
       <div className="glass-card p-6 rounded-2xl border-l-4 border-l-accent relative overflow-hidden group">
