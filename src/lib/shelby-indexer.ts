@@ -20,8 +20,8 @@ export interface ShelbyBlob {
  */
 export async function fetchAccountBlobs(owner: string, apiKey?: string): Promise<ShelbyBlob[]> {
   const query = `
-    query GetUserBlobs($owner: String!) {
-      blobs(where: { owner: { _eq: $owner } }, order_by: { created_at: desc }) {
+    query GetUserBlobs($owners: [String!]!) {
+      blobs(where: { owner: { _in: $owners } }, order_by: { created_at: desc }) {
         blob_name
         size
         created_at
@@ -35,11 +35,15 @@ export async function fetchAccountBlobs(owner: string, apiKey?: string): Promise
   `;
 
   try {
-    const normalizedOwner = normalizeAptosAddress(owner);
+    const padded = normalizeAptosAddress(owner);
+    const shortened = owner.toLowerCase().startsWith("0x") ? "0x" + owner.toLowerCase().substring(2).replace(/^0+/, "") : "0x" + owner.toLowerCase().replace(/^0+/, "");
+    // If the address was just '0', shortening might make it empty. Ensure it's at least '0x0'
+    const finalShortened = shortened === "0x" ? "0x0" : shortened;
+    const owners = Array.from(new Set([padded, finalShortened]));
+
     const effectiveApiKey = apiKey || localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY || PUBLIC_SHELBY_API_KEY;
     
-    console.info("[Shelby] Fetching blobs for:", normalizedOwner);
-    console.info("[Shelby] Using API Key (start):", effectiveApiKey?.slice(0, 5));
+    console.info("[Shelby] Fetching blobs for owners:", owners);
     
     const response = await fetch(SHELBY_INDEXER_URL, {
       method: "POST",
@@ -52,7 +56,7 @@ export async function fetchAccountBlobs(owner: string, apiKey?: string): Promise
       },
       body: JSON.stringify({
         query,
-        variables: { owner: normalizedOwner }
+        variables: { owners }
       })
     });
 
@@ -78,8 +82,8 @@ export async function fetchAccountBlobs(owner: string, apiKey?: string): Promise
  */
 export async function fetchSharedBlobs(sharee: string, apiKey?: string): Promise<ShelbyBlob[]> {
   const query = `
-    query GetSharedBlobs($sharee: String!) {
-      blobs(where: { permissions: { sharee: { _eq: $sharee } } }, order_by: { created_at: desc }) {
+    query GetSharedBlobs($sharees: [String!]!) {
+      blobs(where: { permissions: { sharee: { _in: $sharees } } }, order_by: { created_at: desc }) {
         blob_name
         size
         created_at
@@ -93,7 +97,11 @@ export async function fetchSharedBlobs(sharee: string, apiKey?: string): Promise
   `;
 
   try {
-    const normalizedSharee = normalizeAptosAddress(sharee);
+    const padded = normalizeAptosAddress(sharee);
+    const shortened = sharee.toLowerCase().startsWith("0x") ? "0x" + sharee.toLowerCase().substring(2).replace(/^0+/, "") : "0x" + sharee.toLowerCase().replace(/^0+/, "");
+    const finalShortened = shortened === "0x" ? "0x0" : shortened;
+    const sharees = Array.from(new Set([padded, finalShortened]));
+
     const effectiveApiKey = apiKey || localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY || PUBLIC_SHELBY_API_KEY;
     
     const response = await fetch(SHELBY_INDEXER_URL, {
@@ -107,7 +115,7 @@ export async function fetchSharedBlobs(sharee: string, apiKey?: string): Promise
       },
       body: JSON.stringify({
         query,
-        variables: { sharee: normalizedSharee }
+        variables: { sharees }
       })
     });
 

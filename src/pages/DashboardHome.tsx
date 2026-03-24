@@ -70,6 +70,9 @@ export default function DashboardHome() {
           setLastSync(new Date());
         } catch (err) {
           console.error("Failed to sync blobs:", err);
+          toast.error("Sync failed: Could not retrieve data from Shelby Indexer.", {
+            description: "Check your internet connection or API key settings."
+          });
         } finally {
           setLoading(false);
         }
@@ -161,6 +164,21 @@ export default function DashboardHome() {
                 Synced
               </span>
             )}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => {
+                // We don't have a direct 'loadData' we can call easily if it's in useEffect,
+                // but we can trigger a state change that re-runs the effect.
+                // For simplicity, let's just make the window reload or better, add a refresh state.
+                window.location.reload(); 
+              }}
+              disabled={loading}
+              className="gap-2 h-7 rounded-lg text-[10px] font-bold uppercase"
+            >
+              <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+              Sync Now
+            </Button>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-accent/10 border border-accent/20 px-3 py-1 text-[10px] font-bold text-accent uppercase">
               Aptos Testnet
             </span>
