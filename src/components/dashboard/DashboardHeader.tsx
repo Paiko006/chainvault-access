@@ -1,8 +1,15 @@
-import { Bell, ChevronDown, CheckCircle2, Shield, Zap, Info, AlertCircle, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Bell, ChevronDown, CheckCircle2, Shield, Zap, Info, AlertCircle, Trash2, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { WalletButton } from "@/components/wallet/WalletButton";
 import { useNotifications, NotificationType } from "@/hooks/use-notifications";
 import { formatDistanceToNow } from "date-fns";
+import { SidebarContent } from "./SidebarContent";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +22,7 @@ import {
 export function DashboardHeader() {
   const { notifications, markAllAsRead, clearAll, markAsRead } = useNotifications();
   const unreadCount = notifications.filter(n => !n.read).length;
+  const [open, setOpen] = useState(false);
 
   const getIcon = (type: NotificationType) => {
     switch (type) {
@@ -38,7 +46,20 @@ export function DashboardHeader() {
 
   return (
     <header className="h-16 border-b border-border flex items-center justify-between px-6 bg-card/50 backdrop-blur-sm sticky top-0 z-30">
-      <div />
+      <div className="flex items-center gap-4 lg:hidden">
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-9 w-9">
+              <Menu className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="p-0 border-r-0 w-72 bg-sidebar h-full text-foreground">
+            <SidebarContent onItemClick={() => setOpen(false)} />
+          </SheetContent>
+        </Sheet>
+        <span className="font-display font-bold text-lg">ShelbySecure</span>
+      </div>
+      <div className="hidden lg:block w-1" />
 
       <div className="flex items-center gap-4">
         <WalletButton />
