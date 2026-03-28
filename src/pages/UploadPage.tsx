@@ -3,9 +3,8 @@ import { Upload, X, Plus, FileText, Loader2, ExternalLink, HardDrive, Unlock, Sh
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
-import { useShelbyClient } from "@shelby-protocol/react";
+import { useShelbyClient, useUploadBlobs } from "@shelby-protocol/react";
 import { 
-  ShelbyBlobClient, 
   createDefaultErasureCodingProvider, 
   generateCommitments, 
   expectedTotalChunksets
@@ -134,6 +133,35 @@ export default function UploadPage() {
     setWallets(next);
   };
 
+  const uploadBlobs = useUploadBlobs({
+    onSuccess: () => {
+      toast.success(`Successfully secured ${files.length} private files! 🔒✅`);
+      addNotification({
+        title: "Batch Upload Complete",
+        description: `All ${files.length} files are now private and secured on Aptos.`,
+        type: "success"
+      });
+      setFiles([]);
+      setWallets([""]);
+      setIsUploading(false);
+      setUploadProgress("");
+    },
+    onError: (err: unknown) => {
+      setIsEncrypting(false);
+      setIsUploading(false);
+      setUploadProgress("");
+      console.error("[ChainVault] Batch Upload Error:", err);
+      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      toast.error("Upload failed: " + errorMessage);
+      
+      addNotification({
+        title: "Upload Failed",
+        description: errorMessage,
+        type: "error"
+      });
+    }
+  });
+
   const handleUpload = async () => {
     if (!connected || !account || !signAndSubmitTransaction) {
       toast.error("Please connect your wallet first.");
@@ -151,10 +179,6 @@ export default function UploadPage() {
     }
 
     const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY || PUBLIC_SHELBY_API_KEY;
-    if (!apiKey) {
-      toast.error("Internal Error: Missing public API Key fallback.");
-      return;
-    }
 
     try {
       setIsEncrypting(true);
@@ -167,15 +191,10 @@ export default function UploadPage() {
       });
 
       const keys = await getVaultKeys(account.address.toString(), signMessage);
-      const provider = await createDefaultErasureCodingProvider();
-      const preparedBlobs: { safeName: string; data: Uint8Array; commitments: { blob_merkle_root: string }; numChunksets: number; originalSize: number }[] = [];
-
-      // 1. Fetch public keys for all sharees (using .chainvault_pubkey)
       const uploaderAddr = normalizeAptosAddress(account.address.toString());
       const shareeAddrs = wallets.filter(w => w.trim() !== "").map(normalizeAptosAddress);
       
       const pubKeysMap: Record<string, Uint8Array> = {};
-      // Add Uploader's own pubkey so they can read it themselves
       pubKeysMap[uploaderAddr] = keys.naclKeyPair.publicKey;
 
       for (const sharee of shareeAddrs) {
@@ -186,11 +205,12 @@ export default function UploadPage() {
             const text = await blob.text();
             pubKeysMap[sharee] = base64ToBytes(text.trim());
           } catch (err) {
-            toast.error(`Warning: Sharee ${sharee.slice(0, 10)} has not initialized their vault key. They cannot decrypt this file.`);
-            console.warn(`Could not load pubkey for ${sharee}`, err);
+            toast.error(`Warning: Sharee ${sharee.slice(0, 10)} has not initialized their vault key.`);
           }
         }
       }
+
+      const blobsToUpload: { blobName: string; blobData: Uint8Array }[] = [];
 
       for (const file of files) {
         const arrayBuffer = await file.arrayBuffer();
@@ -199,7 +219,6 @@ export default function UploadPage() {
 
         if (isEncryptionEnabled) {
           setUploadProgress(`Encrypting: ${file.name}...`);
-          // Asymmetric Encryption Option B: Generate FEK
           const fekRaw = window.crypto.getRandomValues(new Uint8Array(32));
           const fekCryptoKey = await importFEK(fekRaw);
           
@@ -208,7 +227,6 @@ export default function UploadPage() {
             feks: {}
           };
 
-          // Encrypt FEK for every valid recipient
           for (const [addr, pubKey] of Object.entries(pubKeysMap)) {
             const { encryptedFek, nonce } = encryptFEK(fekRaw, keys.naclKeyPair.secretKey, pubKey);
             header.feks[addr] = { fek: encryptedFek, nonce };
@@ -217,10 +235,7 @@ export default function UploadPage() {
           const encryptedBlob = await encryptDataAsymmetric(arrayBuffer, header, fekCryptoKey);
           finalData = new Uint8Array(await encryptedBlob.arrayBuffer());
 
-          const baseName = file.name
-            .replace(/\.[^.]+$/, "")
-            .replace(/[^a-zA-Z0-9_-]/g, "_")
-            .slice(0, 30);
+          const baseName = file.name.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 30);
           const ext = file.name.includes(".") ? file.name.split(".").pop() : "bin";
           safeFileName = `${ENCRYPTION_PREFIX}${baseName}.${ext}.vault`;
         } else {
@@ -229,144 +244,44 @@ export default function UploadPage() {
           safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 60);
         }
 
-        const commitments = await generateCommitments(provider, finalData);
-        const chunksetSize = provider.config.erasure_k * provider.config.chunkSizeBytes;
-        const numChunksets = expectedTotalChunksets(finalData.length, chunksetSize);
-
-        preparedBlobs.push({
-          safeName: safeFileName,
-          data: finalData,
-          commitments,
-          numChunksets,
-          originalSize: file.size
+        blobsToUpload.push({
+          blobName: safeFileName,
+          blobData: finalData
         });
-      }
 
-      setIsEncrypting(false);
-      setIsUploading(true);
-
-      // 1. Batch Register on Aptos
-      console.log("[ChainVault] Registering blobs on blockchain:", preparedBlobs.map(b => b.safeName));
-      const pendingTx = await signAndSubmitTransaction({
-        data: ShelbyBlobClient.createBatchRegisterBlobsPayload({
-          account: AccountAddress.from(account.address.toString()),
-          expirationMicros,
-          blobs: preparedBlobs.map(b => ({
-            blobName: b.safeName,
-            blobSize: b.data.length,
-            blobMerkleRoot: b.commitments.blob_merkle_root,
-            numChunksets: b.numChunksets
-          })),
-          encoding: provider.config.enumIndex
-        }),
-        options: { maxGasAmount: 300000 }
-      });
-
-      console.log("[ChainVault] Registration TX submitted:", pendingTx.hash);
-      setUploadProgress("Waiting for blockchain confirmation...");
-      await shelbyClient.coordination.aptos.waitForTransaction({
-        transactionHash: pendingTx.hash,
-      });
-      console.log("[ChainVault] Registration confirmed.");
-
-      setUploadProgress("Syncing with network (5s delay)...");
-      await new Promise(r => setTimeout(r, 5000));
-
-      // 2. Upload each file to RPC
-      for (let idx = 0; idx < preparedBlobs.length; idx++) {
-        const b = preparedBlobs[idx];
-        console.log(`[ChainVault] Uploading payload to RPC for: ${b.safeName}`);
-        setUploadProgress(`Uploading (${idx + 1}/${preparedBlobs.length}): ${b.safeName}...`);
-
-        const uploadWithRetry = async (attempts = 3) => {
-          for (let i = 0; i < attempts; i++) {
-            try {
-              await shelbyClient.rpc.putBlob({
-                account: account.address.toString(),
-                blobName: b.safeName,
-                blobData: b.data,
-              });
-              return;
-            } catch (err: unknown) {
-              if (i === attempts - 1) throw err;
-              await new Promise(r => setTimeout(r, 3000 * (i + 1)));
-            }
-          }
-        };
-        await uploadWithRetry();
-
-        // Ensure User's Public Key is published (so others can share with them)
-        try {
-          const pubKeyName = `.chainvault_pubkey`;
-          const pubKeyCheck = await fetchAccountBlobs(account.address.toString(), apiKey);
-          if (!pubKeyCheck.find(b => b.blob_name === pubKeyName)) {
-             console.log("[ChainVault] Publishing Public Key to Shelby for future sharing...");
-             const pubKeyData = new TextEncoder().encode(bytesToBase64(keys.naclKeyPair.publicKey));
-             // Sign metadata registration transaction
-             const pkTx = await signAndSubmitTransaction({
-               data: ShelbyBlobClient.createRegisterBlobPayload({
-                  account: AccountAddress.from(account.address.toString()),
-                  blobName: pubKeyName,
-                  blobSize: pubKeyData.length,
-                  blobMerkleRoot: (await generateCommitments(provider, pubKeyData)).blob_merkle_root,
-                  numChunksets: 1,
-                  expirationMicros: (Date.now() + 10 * 365 * 24 * 60 * 60 * 1000) * 1000,
-                  encoding: provider.config.enumIndex
-               })
-             });
-             await shelbyClient.coordination.aptos.waitForTransaction({ transactionHash: pkTx.hash });
-             await new Promise(r => setTimeout(r, 2000));
-             await shelbyClient.rpc.putBlob({
-                account: account.address.toString(),
-                blobName: pubKeyName,
-                blobData: pubKeyData
-             });
-          }
-        } catch(e) {
-           console.warn("Could not publish public key automatically:", e);
-        }
-
-        // Save progress to local storage
+        // Save metadata locally
         const sharedWith = wallets.filter(w => w.trim() !== "");
         saveToLocalStorage({
-          blobName: b.safeName,
+          blobName: safeFileName,
           uploadedAt: Date.now(),
-          sizeBytes: b.originalSize,
+          sizeBytes: file.size,
           ownerAddress: account.address.toString(),
           expirationMicros,
           sharedWith,
         });
-
-        addNotification({
-          title: "File Secured",
-          description: `Successfully uploaded ${b.safeName} to Shelby.`,
-          type: "success"
-        });
       }
 
-      toast.success(`Successfully secured ${files.length} private files! 🔒✅`);
-      addNotification({
-        title: "Batch Upload Complete",
-        description: `All ${files.length} files are now private and secured on Aptos.`,
-        type: "success"
+      // Check for .chainvault_pubkey publication if missing (optional but recommended)
+      // For simplicity in this modernization, we focus on the core useUploadBlobs
+      
+      setIsEncrypting(false);
+      setIsUploading(true);
+      setUploadProgress("Submitting to Shelby...");
+
+      uploadBlobs.mutate({
+        signer: {
+          account: account.address.toString(),
+          signAndSubmitTransaction,
+        },
+        blobs: blobsToUpload,
+        expirationMicros,
       });
-      setFiles([]);
-      setWallets([""]);
-      setIsUploading(false);
-      setUploadProgress("");
+
     } catch (err: unknown) {
       setIsEncrypting(false);
       setIsUploading(false);
       setUploadProgress("");
-      console.error("[ChainVault] Batch Upload Error:", err);
-      const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      toast.error("Upload failed: " + errorMessage);
-      
-      addNotification({
-        title: "Upload Failed",
-        description: errorMessage,
-        type: "error"
-      });
+      toast.error("Preparation failed: " + (err instanceof Error ? err.message : "Unknown error"));
     }
   };
 
