@@ -126,28 +126,39 @@ export default function DashboardHome() {
   console.log("%c[ChainVault] Dashboard Component Rendered", "color: cyan; font-weight: bold; font-size: 14px");
   console.log("[ChainVault] Connected:", connected);
   console.log("[ChainVault] Account Address:", account?.address?.toString());
+  console.log("[ChainVault] coinsLoading:", coinsLoading);
+  console.log("[ChainVault] coinsData exists:", !!coinsData);
 
   useEffect(() => {
-    if (!coinsData) {
-      console.log("[ChainVault] Waiting for coinsData...");
-    }
-    if (coinsData && firstPage?.data) {
-      console.log("%c[ChainVault] --- COIN SYNC DEBUG ---", "color: yellow; font-weight: bold");
-      console.log("[ChainVault] Active Account:", account?.address?.toString());
-      console.log("[ChainVault] Looking for Asset Type:", SUSD_TOKEN_ADDRESS);
-      console.log("[ChainVault] Total Assets Found:", firstPage.data.length);
-      
-      const foundSUSD = firstPage.data.find((c: any) => 
-        c.asset_type.toLowerCase() === SUSD_TOKEN_ADDRESS.toLowerCase()
-      );
-      
-      if (foundSUSD) {
-        console.log("%c[ChainVault] SUCCESS: Found ShelbyUSD Asset:", "color: green; font-weight: bold", foundSUSD);
+    console.log("[ChainVault] Effect running. coinsData:", !!coinsData, "account:", !!account);
+    if (coinsData) {
+      console.log("[ChainVault] coinsData structure:", Object.keys(coinsData));
+      if (coinsData.pages) {
+         console.log("[ChainVault] Found pages:", coinsData.pages.length);
+         const page = coinsData.pages[0] as any;
+         if (page && page.data) {
+            console.log("%c[ChainVault] --- COIN SYNC DEBUG ---", "color: yellow; font-weight: bold");
+            console.log("[ChainVault] Active Account:", account?.address?.toString());
+            console.log("[ChainVault] Looking for Asset Type:", SUSD_TOKEN_ADDRESS);
+            console.log("[ChainVault] Total Assets Found:", page.data.length);
+            
+            const foundSUSD = page.data.find((c: any) => 
+              c.asset_type.toLowerCase() === SUSD_TOKEN_ADDRESS.toLowerCase()
+            );
+            
+            if (foundSUSD) {
+              console.log("%c[ChainVault] SUCCESS: Found ShelbyUSD Asset:", "color: green; font-weight: bold", foundSUSD);
+            } else {
+              console.warn("[ChainVault] FAILURE: ShelbyUSD NOT found in list.");
+              console.log("[ChainVault] All detected assets:", page.data.map((c: any) => c.asset_type));
+            }
+            console.log("[ChainVault] ------------------------");
+         } else {
+            console.log("[ChainVault] Page data is missing or empty:", page);
+         }
       } else {
-        console.warn("[ChainVault] FAILURE: ShelbyUSD NOT found in list.");
-        console.log("[ChainVault] All detected assets:", firstPage.data.map((c: any) => c.asset_type));
+         console.log("[ChainVault] coinsData.pages is missing");
       }
-      console.log("[ChainVault] ------------------------");
     }
   }, [coinsData, account, firstPage]);
 
