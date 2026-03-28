@@ -111,7 +111,9 @@ export default function DashboardHome() {
   const totalSize = blobs.reduce((s, b) => s + Number(b.size), 0);
   const lastUpload = blobs[0] ? fromShelbyTimestamp(blobs[0].created_at).toLocaleDateString() : "—";
 
-  // ShelbyUSD Balance - Direct REST API fetch (most reliable method)
+  // ShelbyUSD Balance - Aptos Indexer GraphQL API
+  // FA balances are stored in separate object accounts, not directly in user resources.
+  // The Indexer is the only reliable way to query them.
   const [susdBalance, setSusdBalance] = useState<number>(0);
   const [coinsLoading, setCoinsLoading] = useState(false);
 
@@ -122,63 +124,73 @@ export default function DashboardHome() {
       const addr = account.address.toString();
       
       try {
-        console.log("[ChainVault] Fetching ShelbyUSD via Aptos REST API for:", addr);
+        console.log("[ChainVault] Fetching ShelbyUSD via Aptos Indexer for:", addr);
         
-        // Direct REST API call to Aptos Testnet - most reliable method
+        // GraphQL query to the Aptos Indexer for fungible asset balances
+        const query = `
+          query GetFungibleAssetBalances($address: String!) {
+            current_fungible_asset_balances(
+              where: { owner_address: { _eq: $address } }
+            ) {
+              asset_type
+              amount
+              metadata {
+                name
+                symbol
+                decimals
+              }
+            }
+          }
+        `;
+        
         const response = await fetch(
-          `https://api.testnet.aptoslabs.com/v1/accounts/${addr}/resources`
+          "https://api.testnet.aptoslabs.com/v1/graphql",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              query,
+              variables: { address: addr }
+            })
+          }
         );
         
         if (!response.ok) {
-          console.error("[ChainVault] REST API error:", response.status, response.statusText);
+          console.error("[ChainVault] Indexer API error:", response.status);
           setSusdBalance(0);
           return;
         }
         
-        const resources = await response.json();
-        console.log("[ChainVault] Total account resources:", resources.length);
+        const result = await response.json();
+        const balances = result?.data?.current_fungible_asset_balances || [];
         
-        // Look for the FungibleStore that holds ShelbyUSD
-        // The FA metadata address is: 0x1b18363a9f1fe5e6ebf247daba5cc1c18052bb232efdc4c50f556053922d98e1
-        const fungibleStores = resources.filter((r: any) => 
-          r.type === "0x1::fungible_asset::FungibleStore"
-        );
-        
-        console.log("[ChainVault] FungibleStore resources found:", fungibleStores.length);
-        
-        // Check each FungibleStore's metadata to find ShelbyUSD
-        for (const store of fungibleStores) {
-          const metadata = store.data?.metadata?.inner;
-          console.log("[ChainVault] FungibleStore metadata:", metadata, "balance:", store.data?.balance);
-          
-          if (metadata && metadata.toLowerCase() === SUSD_TOKEN_ADDRESS.toLowerCase()) {
-            const balance = Number(store.data.balance || 0);
-            console.log("%c[ChainVault] SUCCESS: Found ShelbyUSD balance:", "color: green; font-weight: bold; font-size: 14px", balance);
-            setSusdBalance(balance);
-            return;
-          }
-        }
-        
-        // If not found via FungibleStore, also check CoinStore (legacy)
-        const coinStore = resources.find((r: any) => 
-          r.type.includes("shelby_usd") || r.type.includes("SUSD")
-        );
-        
-        if (coinStore) {
-          const coinBalance = Number(coinStore.data?.coin?.value || 0);
-          console.log("[ChainVault] Found legacy CoinStore balance:", coinBalance);
-          setSusdBalance(coinBalance);
-          return;
-        }
-        
-        console.warn("[ChainVault] ShelbyUSD not found in any resource. Checking all metadata addresses...");
-        fungibleStores.forEach((s: any) => {
-          console.log("  ->", s.data?.metadata?.inner, "bal:", s.data?.balance);
+        console.log("[ChainVault] Indexer found", balances.length, "fungible assets");
+        balances.forEach((b: any) => {
+          console.log(`  -> ${b.metadata?.symbol || b.asset_type}: ${b.amount} (${b.metadata?.name})`);
         });
-        setSusdBalance(0);
+        
+        // Find ShelbyUSD by asset_type OR by symbol/name
+        const susd = balances.find((b: any) => 
+          b.asset_type?.toLowerCase() === SUSD_TOKEN_ADDRESS.toLowerCase() ||
+          b.metadata?.symbol?.toUpperCase() === "SHELBY_USD" ||
+          b.metadata?.symbol?.toUpperCase() === "SUSD" ||
+          b.metadata?.name?.toLowerCase()?.includes("shelbyusd") ||
+          b.metadata?.name?.toLowerCase()?.includes("shelby")
+        );
+        
+        if (susd) {
+          const balance = Number(susd.amount || 0);
+          const decimals = susd.metadata?.decimals || 8;
+          console.log("%c[ChainVault] SUCCESS: Found ShelbyUSD!", "color: green; font-weight: bold; font-size: 14px");
+          console.log("[ChainVault] Balance (raw):", balance, "Decimals:", decimals);
+          setSusdBalance(balance);
+        } else {
+          console.warn("[ChainVault] ShelbyUSD not found in indexer results for this account.");
+          setSusdBalance(0);
+        }
         
       } catch (err) {
-        console.error("[ChainVault] REST API fetch error:", err);
+        console.error("[ChainVault] Indexer fetch error:", err);
         setSusdBalance(0);
       } finally {
         setCoinsLoading(false);
