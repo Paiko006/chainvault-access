@@ -26,8 +26,8 @@ function saveToLocalStorage(blob: StoredBlob) {
   }
 }
 
-import { getVaultKey, encryptData, ENCRYPTION_PREFIX, normalizeAptosAddress } from "@/lib/crypto";
-import { PUBLIC_SHELBY_API_KEY, fetchAccountBlobs, formatBytes, syncUserQuota } from "@/lib/shelby-indexer";
+import { getVaultKey, getVaultKeys, encryptDataAsymmetric, importFEK, bytesToBase64, encryptFEK, base64ToBytes, AsymmetricHeader, ENCRYPTION_PREFIX, normalizeAptosAddress } from "@/lib/crypto";
+import { PUBLIC_SHELBY_API_KEY, fetchAccountBlobs, formatBytes, syncUserQuota, fetchBlobData } from "@/lib/shelby-indexer";
 import { QUOTA_STORAGE_KEY, DEFAULT_QUOTA } from "@/components/landing/PricingSection";
 
 export default function UploadPage() {
@@ -165,14 +165,52 @@ export default function UploadPage() {
         type: "info"
       });
 
-      const vaultKey = await getVaultKey(account.address.toString(), signMessage);
+      const keys = await getVaultKeys(account.address.toString(), signMessage);
       const provider = await createDefaultErasureCodingProvider();
       const preparedBlobs: { safeName: string; data: Uint8Array; commitments: { blob_merkle_root: string }; numChunksets: number; originalSize: number }[] = [];
 
+      // 1. Fetch public keys for all sharees (using .chainvault_pubkey)
+      const uploaderAddr = normalizeAptosAddress(account.address.toString());
+      const shareeAddrs = wallets.filter(w => w.trim() !== "").map(normalizeAptosAddress);
+      
+      const pubKeysMap: Record<string, Uint8Array> = {};
+      // Add Uploader's own pubkey so they can read it themselves
+      pubKeysMap[uploaderAddr] = keys.naclKeyPair.publicKey;
+
+      for (const sharee of shareeAddrs) {
+        if (!pubKeysMap[sharee]) {
+          try {
+            setUploadProgress(`Fetching public key for ${sharee.slice(0, 10)}...`);
+            const blob = await fetchBlobData(".chainvault_pubkey", sharee);
+            const text = await blob.text();
+            pubKeysMap[sharee] = base64ToBytes(text.trim());
+          } catch (err) {
+            toast.error(`Warning: Sharee ${sharee.slice(0, 10)} has not initialized their vault key. They cannot decrypt this file.`);
+            console.warn(`Could not load pubkey for ${sharee}`, err);
+          }
+        }
+      }
+
       for (const file of files) {
         setUploadProgress(`Encrypting: ${file.name}...`);
+        
+        // Asymmetric Encryption Option B: Generate FEK
+        const fekRaw = window.crypto.getRandomValues(new Uint8Array(32));
+        const fekCryptoKey = await importFEK(fekRaw);
+        
+        const header: AsymmetricHeader = {
+          uploaderPubKey: bytesToBase64(keys.naclKeyPair.publicKey),
+          feks: {}
+        };
+
+        // Encrypt FEK for every valid recipient
+        for (const [addr, pubKey] of Object.entries(pubKeysMap)) {
+          const { encryptedFek, nonce } = encryptFEK(fekRaw, keys.naclKeyPair.secretKey, pubKey);
+          header.feks[addr] = { fek: encryptedFek, nonce };
+        }
+
         const arrayBuffer = await file.arrayBuffer();
-        const encryptedBlob = await encryptData(arrayBuffer, vaultKey);
+        const encryptedBlob = await encryptDataAsymmetric(arrayBuffer, header, fekCryptoKey);
         const encryptedData = new Uint8Array(await encryptedBlob.arrayBuffer());
 
         const baseName = file.name
@@ -249,6 +287,37 @@ export default function UploadPage() {
             }
           };
           await uploadWithRetry();
+
+          // Ensure User's Public Key is published (so others can share with them)
+          try {
+            const pubKeyName = `.chainvault_pubkey`;
+            const pubKeyCheck = await fetchAccountBlobs(account.address.toString(), apiKey);
+            if (!pubKeyCheck.find(b => b.blob_name === pubKeyName)) {
+               console.log("[ChainVault] Publishing Public Key to Shelby for future sharing...");
+               const pubKeyData = new TextEncoder().encode(bytesToBase64(keys.naclKeyPair.publicKey));
+               // Sign metadata registration transaction
+               const pkTx = await signAndSubmitTransaction({
+                 data: ShelbyBlobClient.createRegisterBlobPayload({
+                    account: AccountAddress.from(account.address.toString()),
+                    blobName: pubKeyName,
+                    blobSize: pubKeyData.length,
+                    blobMerkleRoot: (await generateCommitments(provider, pubKeyData)).blob_merkle_root,
+                    numChunksets: 1,
+                    expirationMicros: (Date.now() + 10 * 365 * 24 * 60 * 60 * 1000) * 1000,
+                    encoding: provider.config.enumIndex
+                 })
+               });
+               await shelbyClient.coordination.aptos.waitForTransaction({ transactionHash: pkTx.hash });
+               await new Promise(r => setTimeout(r, 2000));
+               await shelbyClient.rpc.putBlob({
+                  account: account.address.toString(),
+                  blobName: pubKeyName,
+                  blobData: pubKeyData
+               });
+            }
+          } catch(e) {
+             console.warn("Could not publish public key automatically:", e);
+          }
 
         // Save progress to local storage
         const sharedWith = wallets.filter(w => w.trim() !== "");
@@ -445,21 +514,21 @@ export default function UploadPage() {
         <Button
           variant="hero"
           size="lg"
-          className="w-full rounded-xl py-6"
+          className="w-full rounded-2xl py-7 glass-button"
           disabled={files.length === 0 || !connected || isUploading || isEncrypting}
           onClick={handleUpload}
         >
           {isEncrypting || isUploading ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
               {uploadProgress}
             </>
           ) : !connected ? (
             "Connect Wallet to Upload"
           ) : (
             <>
-              <Upload className="mr-2 h-4 w-4" />
-              Sign & Secure {files.length} File{files.length > 1 ? 's' : ''}
+              <Upload className="mr-2 h-5 w-5" />
+              <span className="font-bold text-base">Sign & Secure {files.length} File{files.length > 1 ? 's' : ''}</span>
             </>
           )}
         </Button>

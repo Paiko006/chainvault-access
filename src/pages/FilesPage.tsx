@@ -39,7 +39,7 @@ import {
   syncUserQuota 
 } from "@/lib/shelby-indexer";
 import { shortenAddress } from "@/lib/wallet";
-import { getVaultKey, decryptData, ENCRYPTION_PREFIX, normalizeAptosAddress } from "@/lib/crypto";
+import { getVaultKeys, getVaultKey, decryptData, decryptDataAsymmetric, ENCRYPTION_PREFIX, normalizeAptosAddress } from "@/lib/crypto";
 import { useNotifications } from "@/hooks/use-notifications";
 import { QUOTA_STORAGE_KEY, DEFAULT_QUOTA } from "@/components/landing/PricingSection";
 import { 
@@ -93,11 +93,7 @@ export default function FilesPage() {
     }
   };
 
-  // Decryption Modal State
-  const [isDecryptModalOpen, setIsDecryptModalOpen] = useState(false);
-  const [activeSharedBlob, setActiveSharedBlob] = useState<ShelbyBlob | null>(null);
-  const [manualKey, setManualKey] = useState("");
-
+  // Decryption Modal State (Removed - Asymmetric Encryption is now automatic)
   const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY;
 
   useEffect(() => {
@@ -164,9 +160,22 @@ export default function FilesPage() {
 
       // 2. Decrypt if needed
       if (isEncrypted) {
-        const key = await getVaultKey(account.address.toString(), signMessage);
-        finalBlob = await decryptData(rawBlob, key);
-        toast.success("File decrypted successfully! 🔓", { id: "dl-toast" });
+        const keys = await getVaultKeys(account.address.toString(), signMessage);
+        try {
+          // Attempt Asymmetric Decryption first
+          finalBlob = await decryptDataAsymmetric(rawBlob, account.address.toString(), keys);
+          toast.success("File decrypted securely! 🔓", { id: "dl-toast" });
+        } catch (err: any) {
+          // Fallback to legacy Master Key
+          try {
+            finalBlob = await decryptData(rawBlob, keys.aesKey);
+            toast.success("File decrypted via legacy vault! 🔓", { id: "dl-toast" });
+          } catch (fallbackErr) {
+            console.error("Asymmetric Error:", err);
+            console.error("Legacy Error:", fallbackErr);
+            throw new Error("Decryption failed. You do not have permission or keys are invalid.");
+          }
+        }
       } else {
         toast.success("Download complete!", { id: "dl-toast" });
       }
@@ -191,51 +200,6 @@ export default function FilesPage() {
       console.error("[ChainVault] Download/Decrypt error:", err);
       const errorMsg = err instanceof Error ? err.message : "Check your vault key or internet connection.";
       toast.error(`Error: ${errorMsg}`, { id: "dl-toast" });
-    } finally {
-      setDownloadingId(null);
-    }
-  };
-
-  const handleSharedDownload = async () => {
-    if (!activeSharedBlob || !manualKey || !account) return;
-    
-    setDownloadingId(activeSharedBlob.blob_name);
-    setIsDecryptModalOpen(false);
-    
-    try {
-      const cleanName = activeSharedBlob.blob_name.includes('/') 
-        ? activeSharedBlob.blob_name.split('/').slice(1).join('/') 
-        : activeSharedBlob.blob_name;
-      
-      toast.loading("Fetching & Decrypting shared asset...", { id: "dl-shared-toast" });
-
-      // 1. Fetch raw data
-      const rawBlob = await fetchBlobData(activeSharedBlob.blob_name, activeSharedBlob.owner);
-      
-      // 2. Use manual key provided by owner
-      const key = await getVaultKey(manualKey);
-      const finalBlob = await decryptData(rawBlob, key);
-      
-      toast.success("Shared file decrypted successfully! 🔓", { id: "dl-shared-toast" });
-
-      // 3. Download
-      const url = window.URL.createObjectURL(finalBlob);
-      const a = document.createElement("a");
-      a.href = url;
-      const fileNameForUser = cleanName
-        .replace(ENCRYPTION_PREFIX, "")
-        .replace("ENC:v1:", "")
-        .replace(/\.vault$/i, "");
-      a.download = `shared-${fileNameForUser}`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
-      setManualKey("");
-    } catch (err: unknown) {
-      console.error("[ChainVault] Shared Download error:", err);
-      toast.error("Decryption failed. Please verify the owner's vault key.", { id: "dl-shared-toast" });
     } finally {
       setDownloadingId(null);
     }
@@ -495,65 +459,12 @@ export default function FilesPage() {
           ) : (
             <FileTable 
               list={sharedBlobs.filter(b => b.blob_name.toLowerCase().includes(search.toLowerCase()))} 
-              onDownload={(b) => {
-                setActiveSharedBlob(b);
-                setIsDecryptModalOpen(true);
-              }}
+              onDownload={handleDownload}
               isShared 
             />
           )}
         </TabsContent>
       </Tabs>
-
-      {/* Decryption Dialog for Shared Files */}
-      <Dialog open={isDecryptModalOpen} onOpenChange={setIsDecryptModalOpen}>
-        <DialogContent className="sm:max-w-[425px] glass-card border-border/50 backdrop-blur-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Key className="h-5 w-5 text-accent" />
-              Security Authorization
-            </DialogTitle>
-            <DialogDescription className="text-xs pt-1">
-              File <span className="text-foreground font-mono font-bold">"{activeSharedBlob?.blob_name.split('/').pop()?.replace('.vault','')}"</span> is encrypted.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-6 space-y-4">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                Decryption Context (Owner's Vault Key)
-              </label>
-              <Input
-                type="password"
-                placeholder="Enter the key provided by the owner..."
-                value={manualKey}
-                onChange={(e) => setManualKey(e.target.value)}
-                className="bg-muted/10 border-border/50"
-              />
-            </div>
-            <div className="bg-accent/5 border border-accent/20 p-4 rounded-xl flex gap-3">
-              <Eye className="h-5 w-5 text-accent shrink-0" />
-              <p className="text-[10px] text-accent-foreground leading-relaxed">
-                Shared files require the original vault key for end-to-end decryption.
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2 justify-end">
-            <Button variant="ghost" className="rounded-lg" onClick={() => setIsDecryptModalOpen(false)}>Cancel</Button>
-            <Button 
-                onClick={handleSharedDownload}
-                disabled={!manualKey || !!downloadingId}
-                className="bg-accent hover:bg-accent/80 text-accent-foreground rounded-lg"
-            >
-                {downloadingId === activeSharedBlob?.blob_name ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Download className="h-4 w-4 mr-2" />
-                )}
-                Verify & Decrypt
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
