@@ -121,12 +121,16 @@ export default function DashboardHome() {
   const susdBalance = firstPage?.data?.find((c: any) => c.asset_type === SUSD_TOKEN_ADDRESS)?.amount || 0;
 
   useEffect(() => {
-    if (coinsData) {
-      console.log("[ChainVault] Coins Data:", coinsData);
-      console.log("[ChainVault] Looking for Asset:", SUSD_TOKEN_ADDRESS);
-      console.log("[ChainVault] Found Balance:", susdBalance);
+    if (coinsData && coinsData.pages[0]) {
+      console.log("[ChainVault] FULL COINS LIST:", coinsData.pages[0].data);
+      const found = coinsData.pages[0].data.find((c: any) => c.asset_type.toLowerCase().includes("shelby_usd"));
+      if (found) {
+        console.log("[ChainVault] Found matching coin:", found);
+      } else {
+        console.warn("[ChainVault] No coin found matching 'shelby_usd' in the list.");
+      }
     }
-  }, [coinsData, susdBalance]);
+  }, [coinsData]);
 
   const aptDisplay = balanceLoading
     ? "…"
