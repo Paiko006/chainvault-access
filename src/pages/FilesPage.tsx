@@ -139,9 +139,9 @@ export default function FilesPage() {
 
     if (!isFirstOccurrence) return false;
 
-    // 2. Hide system files starting with '.' (like .quota, .chainvault_pubkey)
-    // If you want to see these, comment out the line below.
-    if (rawName.startsWith('.')) return false;
+    // Explorer shows all files including system files like .quota and .chainvault_pubkey
+    // So we should NOT hide them, otherwise our count will be strictly less than Explorer.
+    // if (rawName.startsWith('.')) return false;
 
     // 3. Basic text search filter
     if (search && !rawName.toLowerCase().includes(search.toLowerCase())) return false;
