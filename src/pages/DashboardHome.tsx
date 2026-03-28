@@ -10,7 +10,6 @@ import { shortenAddress } from "@/lib/wallet";
 import { fetchAccountBlobs, ShelbyBlob, formatBytes, fromShelbyTimestamp, syncUserQuota } from "@/lib/shelby-indexer";
 import { getVaultKey, normalizeAptosAddress } from "@/lib/crypto";
 import { QUOTA_STORAGE_KEY, DEFAULT_QUOTA, SUSD_TOKEN_ADDRESS } from "@/components/landing/PricingSection";
-import { useAccountCoins } from "@aptos-labs/react";
 
 export default function DashboardHome() {
   const { connected, account, signMessage } = useWallet();
@@ -112,103 +111,82 @@ export default function DashboardHome() {
   const totalSize = blobs.reduce((s, b) => s + Number(b.size), 0);
   const lastUpload = blobs[0] ? fromShelbyTimestamp(blobs[0].created_at).toLocaleDateString() : "—";
 
-  // DIRECT RPC FALLBACK for ShelbyUSD
+  // ShelbyUSD Balance - Direct REST API fetch (most reliable method)
   const [susdBalance, setSusdBalance] = useState<number>(0);
   const [coinsLoading, setCoinsLoading] = useState(false);
 
   useEffect(() => {
-    async function fetchSUSD() {
+    async function fetchShelbyUSD() {
       if (!account) return;
       setCoinsLoading(true);
+      const addr = account.address.toString();
+      
       try {
-        console.log("[ChainVault] Attempting direct RPC fetch for SUSD...");
-        const addr = account.address.toString();
+        console.log("[ChainVault] Fetching ShelbyUSD via Aptos REST API for:", addr);
         
-        // Use the official Aptos provider via ShelbyClient or direct
-        // ShelbyClient already has an aptos client internally
-        const aptos = (shelbyClient as any).aptos; 
-        if (!aptos) {
-          console.warn("[ChainVault] Aptos client not found on shelbyClient");
+        // Direct REST API call to Aptos Testnet - most reliable method
+        const response = await fetch(
+          `https://api.testnet.aptoslabs.com/v1/accounts/${addr}/resources`
+        );
+        
+        if (!response.ok) {
+          console.error("[ChainVault] REST API error:", response.status, response.statusText);
+          setSusdBalance(0);
           return;
         }
-
-        // Fetch account's fungible assets directly
-        const resources = await aptos.getAccountCoinsData({
-          accountAddress: addr
-        });
-
-        console.log("[ChainVault] Direct RPC Coins Found:", resources?.length);
-        const susd = resources?.find((c: any) => c.asset_type === SUSD_TOKEN_ADDRESS);
         
-        if (susd) {
-          console.log("[ChainVault] Direct RPC SUCCESS:", susd);
-          setSusdBalance(Number(susd.amount));
-        } else {
-          console.log("[ChainVault] Direct RPC: SUSD not found in resources");
-          setSusdBalance(0);
+        const resources = await response.json();
+        console.log("[ChainVault] Total account resources:", resources.length);
+        
+        // Look for the FungibleStore that holds ShelbyUSD
+        // The FA metadata address is: 0x1b18363a9f1fe5e6ebf247daba5cc1c18052bb232efdc4c50f556053922d98e1
+        const fungibleStores = resources.filter((r: any) => 
+          r.type === "0x1::fungible_asset::FungibleStore"
+        );
+        
+        console.log("[ChainVault] FungibleStore resources found:", fungibleStores.length);
+        
+        // Check each FungibleStore's metadata to find ShelbyUSD
+        for (const store of fungibleStores) {
+          const metadata = store.data?.metadata?.inner;
+          console.log("[ChainVault] FungibleStore metadata:", metadata, "balance:", store.data?.balance);
+          
+          if (metadata && metadata.toLowerCase() === SUSD_TOKEN_ADDRESS.toLowerCase()) {
+            const balance = Number(store.data.balance || 0);
+            console.log("%c[ChainVault] SUCCESS: Found ShelbyUSD balance:", "color: green; font-weight: bold; font-size: 14px", balance);
+            setSusdBalance(balance);
+            return;
+          }
         }
+        
+        // If not found via FungibleStore, also check CoinStore (legacy)
+        const coinStore = resources.find((r: any) => 
+          r.type.includes("shelby_usd") || r.type.includes("SUSD")
+        );
+        
+        if (coinStore) {
+          const coinBalance = Number(coinStore.data?.coin?.value || 0);
+          console.log("[ChainVault] Found legacy CoinStore balance:", coinBalance);
+          setSusdBalance(coinBalance);
+          return;
+        }
+        
+        console.warn("[ChainVault] ShelbyUSD not found in any resource. Checking all metadata addresses...");
+        fungibleStores.forEach((s: any) => {
+          console.log("  ->", s.data?.metadata?.inner, "bal:", s.data?.balance);
+        });
+        setSusdBalance(0);
+        
       } catch (err) {
-        console.error("[ChainVault] Direct RPC Error:", err);
+        console.error("[ChainVault] REST API fetch error:", err);
+        setSusdBalance(0);
       } finally {
         setCoinsLoading(false);
       }
     }
-    fetchSUSD();
-  }, [account, shelbyClient, blobs]); // Re-fetch when blobs sync (proxy for activity)
-
-  // Disabling the problematic hook for now to avoid console noise
-  const coinsData = null; 
-  /*
-  const { data: coinsData, isLoading: coinsLoadingHook } = useAccountCoins({
-    address: account?.address?.toString() || "",
-  });
-  */
-
-  // Extract SUSD balance from the first page of the infinite query
-  // ShelbyUSD is a Fungible Asset on Aptos Testnet
-  const firstPage = coinsData?.pages[0] as any;
-  const susdCoin = firstPage?.data?.find((c: any) => c.asset_type === SUSD_TOKEN_ADDRESS);
-  const susdBalance = susdCoin?.amount || 0;
-
-  // HYPER VISIBLE DEBUG
-  console.log("%c[ChainVault] Dashboard Component Rendered", "color: cyan; font-weight: bold; font-size: 14px");
-  console.log("[ChainVault] Connected:", connected);
-  console.log("[ChainVault] Account Address:", account?.address?.toString());
-  console.log("[ChainVault] coinsLoading:", coinsLoading);
-  console.log("[ChainVault] coinsData exists:", !!coinsData);
-
-  useEffect(() => {
-    console.log("[ChainVault] Effect running. coinsData:", !!coinsData, "account:", !!account);
-    if (coinsData) {
-      console.log("[ChainVault] coinsData structure:", Object.keys(coinsData));
-      if (coinsData.pages) {
-         console.log("[ChainVault] Found pages:", coinsData.pages.length);
-         const page = coinsData.pages[0] as any;
-         if (page && page.data) {
-            console.log("%c[ChainVault] --- COIN SYNC DEBUG ---", "color: yellow; font-weight: bold");
-            console.log("[ChainVault] Active Account:", account?.address?.toString());
-            console.log("[ChainVault] Looking for Asset Type:", SUSD_TOKEN_ADDRESS);
-            console.log("[ChainVault] Total Assets Found:", page.data.length);
-            
-            const foundSUSD = page.data.find((c: any) => 
-              c.asset_type.toLowerCase() === SUSD_TOKEN_ADDRESS.toLowerCase()
-            );
-            
-            if (foundSUSD) {
-              console.log("%c[ChainVault] SUCCESS: Found ShelbyUSD Asset:", "color: green; font-weight: bold", foundSUSD);
-            } else {
-              console.warn("[ChainVault] FAILURE: ShelbyUSD NOT found in list.");
-              console.log("[ChainVault] All detected assets:", page.data.map((c: any) => c.asset_type));
-            }
-            console.log("[ChainVault] ------------------------");
-         } else {
-            console.log("[ChainVault] Page data is missing or empty:", page);
-         }
-      } else {
-         console.log("[ChainVault] coinsData.pages is missing");
-      }
-    }
-  }, [coinsData, account, firstPage]);
+    
+    fetchShelbyUSD();
+  }, [account, connected]);
 
   const aptDisplay = balanceLoading
     ? "…"
