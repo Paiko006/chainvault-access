@@ -126,9 +126,14 @@ export default function FilesPage() {
     loadFiles();
   }, [connected, account, refresh, apiKey]);
 
-  const filtered = blobs.filter((b) =>
-    b.blob_name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = blobs.filter((b) => {
+    // Basic text search filter
+    if (search && !b.blob_name.toLowerCase().includes(search.toLowerCase())) return false;
+    
+    // We show all files (including .quota and hidden system files) 
+    // to match 100% with Shelby Explorer count as requested.
+    return true;
+  });
 
   const handleDownload = async (b: ShelbyBlob) => {
     if (!account) {
@@ -147,9 +152,13 @@ export default function FilesPage() {
     try {
       // Indexer returns "@address/suffix". Strip prefix for logic.
       const cleanName = b.blob_name.includes('/') ? b.blob_name.split('/').slice(1).join('/') : b.blob_name;
+      
+      // Support multiple common encryption prefixes for cross-app compatibility
       const isEncrypted = cleanName.startsWith(ENCRYPTION_PREFIX) || 
+                          cleanName.startsWith("ENC-v1-") ||
                           cleanName.startsWith("ENC:v1:") || 
-                          cleanName.toLowerCase().endsWith(".vault");
+                          cleanName.toLowerCase().endsWith(".vault") ||
+                          cleanName.includes("shelbysecure/");
       
       toast.loading(isEncrypted ? "Decrypting from Vault..." : "Downloading from Shelby...", { id: "dl-toast" });
 
@@ -162,18 +171,18 @@ export default function FilesPage() {
       if (isEncrypted) {
         const keys = await getVaultKeys(account.address.toString(), signMessage);
         try {
-          // Attempt Asymmetric Decryption first
+          // Attempt Asymmetric Decryption first (New Standard)
           finalBlob = await decryptDataAsymmetric(rawBlob, account.address.toString(), keys);
           toast.success("File decrypted securely! 🔓", { id: "dl-toast" });
         } catch (err: any) {
-          // Fallback to legacy Master Key
+          // Fallback to legacy Master Key (Backward Compatibility)
           try {
+            // Some apps like SoobinVault use keys derived from the master key
             finalBlob = await decryptData(rawBlob, keys.aesKey);
-            toast.success("File decrypted via legacy vault! 🔓", { id: "dl-toast" });
+            toast.success("File decrypted via master vault! 🔓", { id: "dl-toast" });
           } catch (fallbackErr) {
-            console.error("Asymmetric Error:", err);
-            console.error("Legacy Error:", fallbackErr);
-            throw new Error("Decryption failed. You do not have permission or keys are invalid.");
+            console.warn("Asymmetric & Legacy Decryption failed for:", cleanName);
+            throw new Error("Decryption failed. This file might be from another app or encrypted with a different key.");
           }
         }
       } else {
@@ -486,6 +495,7 @@ const FileTable = ({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border/30 text-muted-foreground">
+              <th className="text-left px-5 py-3 font-medium uppercase text-[10px] w-12">#</th>
               <th className="text-left px-5 py-3 font-medium uppercase text-[10px]">Asset Name</th>
               <th className="text-left px-5 py-3 font-medium hidden sm:table-cell uppercase text-[10px]">Capacity</th>
               <th className="text-left px-5 py-3 font-medium hidden md:table-cell uppercase text-[10px]">Created At</th>
@@ -509,6 +519,9 @@ const FileTable = ({
 
               return (
                 <tr key={b.blob_name} className="border-b border-border/20 hover:bg-muted/10 transition-colors group">
+                  <td className="px-5 py-3.5 text-muted-foreground font-mono text-xs tabular-nums opacity-60">
+                    {(idx + 1).toString().padStart(2, '0')}
+                  </td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center relative border border-primary/5">

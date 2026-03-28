@@ -35,6 +35,7 @@ export default function UploadPage() {
   const [dragOver, setDragOver] = useState(false);
   const [wallets, setWallets] = useState<string[]>([""]);
   const [isEncrypting, setIsEncrypting] = useState(false);
+  const [isEncryptionEnabled, setIsEncryptionEnabled] = useState(true);
   const { account, signAndSubmitTransaction, connected, signMessage } = useWallet();
   const { addNotification } = useNotifications();
 
@@ -192,41 +193,49 @@ export default function UploadPage() {
       }
 
       for (const file of files) {
-        setUploadProgress(`Encrypting: ${file.name}...`);
-        
-        // Asymmetric Encryption Option B: Generate FEK
-        const fekRaw = window.crypto.getRandomValues(new Uint8Array(32));
-        const fekCryptoKey = await importFEK(fekRaw);
-        
-        const header: AsymmetricHeader = {
-          uploaderPubKey: bytesToBase64(keys.naclKeyPair.publicKey),
-          feks: {}
-        };
+        const arrayBuffer = await file.arrayBuffer();
+        let finalData: Uint8Array;
+        let safeFileName: string;
 
-        // Encrypt FEK for every valid recipient
-        for (const [addr, pubKey] of Object.entries(pubKeysMap)) {
-          const { encryptedFek, nonce } = encryptFEK(fekRaw, keys.naclKeyPair.secretKey, pubKey);
-          header.feks[addr] = { fek: encryptedFek, nonce };
+        if (isEncryptionEnabled) {
+          setUploadProgress(`Encrypting: ${file.name}...`);
+          // Asymmetric Encryption Option B: Generate FEK
+          const fekRaw = window.crypto.getRandomValues(new Uint8Array(32));
+          const fekCryptoKey = await importFEK(fekRaw);
+          
+          const header: AsymmetricHeader = {
+            uploaderPubKey: bytesToBase64(keys.naclKeyPair.publicKey),
+            feks: {}
+          };
+
+          // Encrypt FEK for every valid recipient
+          for (const [addr, pubKey] of Object.entries(pubKeysMap)) {
+            const { encryptedFek, nonce } = encryptFEK(fekRaw, keys.naclKeyPair.secretKey, pubKey);
+            header.feks[addr] = { fek: encryptedFek, nonce };
+          }
+
+          const encryptedBlob = await encryptDataAsymmetric(arrayBuffer, header, fekCryptoKey);
+          finalData = new Uint8Array(await encryptedBlob.arrayBuffer());
+
+          const baseName = file.name
+            .replace(/\.[^.]+$/, "")
+            .replace(/[^a-zA-Z0-9_-]/g, "_")
+            .slice(0, 30);
+          const ext = file.name.includes(".") ? file.name.split(".").pop() : "bin";
+          safeFileName = `${ENCRYPTION_PREFIX}${baseName}.${ext}.vault`;
+        } else {
+          setUploadProgress(`Preparing Public File: ${file.name}...`);
+          finalData = new Uint8Array(arrayBuffer);
+          safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 60);
         }
 
-        const arrayBuffer = await file.arrayBuffer();
-        const encryptedBlob = await encryptDataAsymmetric(arrayBuffer, header, fekCryptoKey);
-        const encryptedData = new Uint8Array(await encryptedBlob.arrayBuffer());
-
-        const baseName = file.name
-          .replace(/\.[^.]+$/, "")
-          .replace(/[^a-zA-Z0-9_-]/g, "_")
-          .slice(0, 30);
-        const ext = file.name.includes(".") ? file.name.split(".").pop() : "bin";
-        const safeFileName = `${ENCRYPTION_PREFIX}${baseName}.${ext}.vault`;
-
-        const commitments = await generateCommitments(provider, encryptedData);
+        const commitments = await generateCommitments(provider, finalData);
         const chunksetSize = provider.config.erasure_k * provider.config.chunkSizeBytes;
-        const numChunksets = expectedTotalChunksets(encryptedData.length, chunksetSize);
+        const numChunksets = expectedTotalChunksets(finalData.length, chunksetSize);
 
         preparedBlobs.push({
           safeName: safeFileName,
-          data: encryptedData,
+          data: finalData,
           commitments,
           numChunksets,
           originalSize: file.size
@@ -236,88 +245,86 @@ export default function UploadPage() {
       setIsEncrypting(false);
       setIsUploading(true);
 
-        // 1. Batch Register on Aptos
-        console.log("[ChainVault] Registering blobs on blockchain:", preparedBlobs.map(b => b.safeName));
-        const pendingTx = await signAndSubmitTransaction({
-          data: ShelbyBlobClient.createBatchRegisterBlobsPayload({
-            account: AccountAddress.from(account.address.toString()),
-            expirationMicros,
-            blobs: preparedBlobs.map(b => ({
-              blobName: b.safeName,
-              blobSize: b.data.length,
-              blobMerkleRoot: b.commitments.blob_merkle_root,
-              numChunksets: b.numChunksets
-            })),
-            encoding: provider.config.enumIndex
-          }),
-          options: { maxGasAmount: 300000 }
-        });
+      // 1. Batch Register on Aptos
+      console.log("[ChainVault] Registering blobs on blockchain:", preparedBlobs.map(b => b.safeName));
+      const pendingTx = await signAndSubmitTransaction({
+        data: ShelbyBlobClient.createBatchRegisterBlobsPayload({
+          account: AccountAddress.from(account.address.toString()),
+          expirationMicros,
+          blobs: preparedBlobs.map(b => ({
+            blobName: b.safeName,
+            blobSize: b.data.length,
+            blobMerkleRoot: b.commitments.blob_merkle_root,
+            numChunksets: b.numChunksets
+          })),
+          encoding: provider.config.enumIndex
+        }),
+        options: { maxGasAmount: 300000 }
+      });
 
-        console.log("[ChainVault] Registration TX submitted:", pendingTx.hash);
-        setUploadProgress("Waiting for blockchain confirmation...");
-        await shelbyClient.coordination.aptos.waitForTransaction({
-          transactionHash: pendingTx.hash,
-        });
-        console.log("[ChainVault] Registration confirmed.");
+      console.log("[ChainVault] Registration TX submitted:", pendingTx.hash);
+      setUploadProgress("Waiting for blockchain confirmation...");
+      await shelbyClient.coordination.aptos.waitForTransaction({
+        transactionHash: pendingTx.hash,
+      });
+      console.log("[ChainVault] Registration confirmed.");
 
-        setUploadProgress("Syncing with network (5s delay)...");
-        await new Promise(r => setTimeout(r, 5000));
+      setUploadProgress("Syncing with network (5s delay)...");
+      await new Promise(r => setTimeout(r, 5000));
 
-        // 2. Upload each file to RPC
-        for (let idx = 0; idx < preparedBlobs.length; idx++) {
-          const b = preparedBlobs[idx];
-          console.log(`[ChainVault] Uploading payload to RPC for: ${b.safeName}`);
-          setUploadProgress(`Uploading (${idx + 1}/${preparedBlobs.length}): ${b.safeName}...`);
+      // 2. Upload each file to RPC
+      for (let idx = 0; idx < preparedBlobs.length; idx++) {
+        const b = preparedBlobs[idx];
+        console.log(`[ChainVault] Uploading payload to RPC for: ${b.safeName}`);
+        setUploadProgress(`Uploading (${idx + 1}/${preparedBlobs.length}): ${b.safeName}...`);
 
-          const uploadWithRetry = async (attempts = 3) => {
-            for (let i = 0; i < attempts; i++) {
-              try {
-                const res = await shelbyClient.rpc.putBlob({
-                  account: account.address.toString(),
-                  blobName: b.safeName,
-                  blobData: b.data,
-                });
-                console.log(`[ChainVault] RPC PUT success for ${b.safeName}:`, res);
-                return;
-              } catch (err: unknown) {
-                console.warn(`[ChainVault] RPC PUT attempt ${i + 1} failed for ${b.safeName}:`, err);
-                if (i === attempts - 1) throw err;
-                await new Promise(r => setTimeout(r, 3000 * (i + 1)));
-              }
+        const uploadWithRetry = async (attempts = 3) => {
+          for (let i = 0; i < attempts; i++) {
+            try {
+              await shelbyClient.rpc.putBlob({
+                account: account.address.toString(),
+                blobName: b.safeName,
+                blobData: b.data,
+              });
+              return;
+            } catch (err: unknown) {
+              if (i === attempts - 1) throw err;
+              await new Promise(r => setTimeout(r, 3000 * (i + 1)));
             }
-          };
-          await uploadWithRetry();
-
-          // Ensure User's Public Key is published (so others can share with them)
-          try {
-            const pubKeyName = `.chainvault_pubkey`;
-            const pubKeyCheck = await fetchAccountBlobs(account.address.toString(), apiKey);
-            if (!pubKeyCheck.find(b => b.blob_name === pubKeyName)) {
-               console.log("[ChainVault] Publishing Public Key to Shelby for future sharing...");
-               const pubKeyData = new TextEncoder().encode(bytesToBase64(keys.naclKeyPair.publicKey));
-               // Sign metadata registration transaction
-               const pkTx = await signAndSubmitTransaction({
-                 data: ShelbyBlobClient.createRegisterBlobPayload({
-                    account: AccountAddress.from(account.address.toString()),
-                    blobName: pubKeyName,
-                    blobSize: pubKeyData.length,
-                    blobMerkleRoot: (await generateCommitments(provider, pubKeyData)).blob_merkle_root,
-                    numChunksets: 1,
-                    expirationMicros: (Date.now() + 10 * 365 * 24 * 60 * 60 * 1000) * 1000,
-                    encoding: provider.config.enumIndex
-                 })
-               });
-               await shelbyClient.coordination.aptos.waitForTransaction({ transactionHash: pkTx.hash });
-               await new Promise(r => setTimeout(r, 2000));
-               await shelbyClient.rpc.putBlob({
-                  account: account.address.toString(),
-                  blobName: pubKeyName,
-                  blobData: pubKeyData
-               });
-            }
-          } catch(e) {
-             console.warn("Could not publish public key automatically:", e);
           }
+        };
+        await uploadWithRetry();
+
+        // Ensure User's Public Key is published (so others can share with them)
+        try {
+          const pubKeyName = `.chainvault_pubkey`;
+          const pubKeyCheck = await fetchAccountBlobs(account.address.toString(), apiKey);
+          if (!pubKeyCheck.find(b => b.blob_name === pubKeyName)) {
+             console.log("[ChainVault] Publishing Public Key to Shelby for future sharing...");
+             const pubKeyData = new TextEncoder().encode(bytesToBase64(keys.naclKeyPair.publicKey));
+             // Sign metadata registration transaction
+             const pkTx = await signAndSubmitTransaction({
+               data: ShelbyBlobClient.createRegisterBlobPayload({
+                  account: AccountAddress.from(account.address.toString()),
+                  blobName: pubKeyName,
+                  blobSize: pubKeyData.length,
+                  blobMerkleRoot: (await generateCommitments(provider, pubKeyData)).blob_merkle_root,
+                  numChunksets: 1,
+                  expirationMicros: (Date.now() + 10 * 365 * 24 * 60 * 60 * 1000) * 1000,
+                  encoding: provider.config.enumIndex
+               })
+             });
+             await shelbyClient.coordination.aptos.waitForTransaction({ transactionHash: pkTx.hash });
+             await new Promise(r => setTimeout(r, 2000));
+             await shelbyClient.rpc.putBlob({
+                account: account.address.toString(),
+                blobName: pubKeyName,
+                blobData: pubKeyData
+             });
+          }
+        } catch(e) {
+           console.warn("Could not publish public key automatically:", e);
+        }
 
         // Save progress to local storage
         const sharedWith = wallets.filter(w => w.trim() !== "");
@@ -387,6 +394,38 @@ export default function UploadPage() {
         </a>
       </div>
 
+      <div className="glass-card px-4 py-4 rounded-xl border border-primary/20 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className={`h-10 w-10 rounded-lg flex items-center justify-center transition-colors ${isEncryptionEnabled ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
+            <ShieldCheck className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="text-sm font-bold flex items-center gap-2">
+              Privacy Mode: {isEncryptionEnabled ? 'Encrypted' : 'Public'}
+              {isEncryptionEnabled ? (
+                <span className="text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded border border-primary/30 uppercase">Secure</span>
+              ) : (
+                <span className="text-[9px] bg-yellow-500/20 text-yellow-500 px-1.5 py-0.5 rounded border border-yellow-500/30 uppercase">Open</span>
+              )}
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              {isEncryptionEnabled 
+                ? "Files are encrypted locally. Only authorized wallets can open them." 
+                : "Files are stored as-is. Anyone with the link can view them."}
+            </p>
+          </div>
+        </div>
+        <div 
+          className="flex items-center gap-2 cursor-pointer select-none"
+          onClick={() => setIsEncryptionEnabled(!isEncryptionEnabled)}
+        >
+          <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Encryption</span>
+          <div className={`w-12 h-6 rounded-full p-1 transition-colors relative ${isEncryptionEnabled ? 'bg-primary' : 'bg-muted'}`}>
+            <div className={`w-4 h-4 bg-white rounded-full transition-all shadow-sm ${isEncryptionEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+          </div>
+        </div>
+      </div>
+
       <div className="glass-card px-4 py-3 rounded-xl border border-accent/20 bg-accent/5 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
            <HardDrive className="h-4 w-4 text-accent" />
@@ -432,7 +471,9 @@ export default function UploadPage() {
               <Upload className="h-8 w-8 text-muted-foreground" />
             </div>
             <div className="font-medium">Drag & drop files here</div>
-            <div className="text-xs text-muted-foreground">Up to 10 files. Encrypted locally via AES-256.</div>
+            <div className="text-xs text-muted-foreground">
+              Up to 10 files. {isEncryptionEnabled ? 'Encrypted locally via AES-256.' : 'Will be stored as public assets.'}
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -527,8 +568,10 @@ export default function UploadPage() {
             "Connect Wallet to Upload"
           ) : (
             <>
-              <Upload className="mr-2 h-5 w-5" />
-              <span className="font-bold text-base">Sign & Secure {files.length} File{files.length > 1 ? 's' : ''}</span>
+              {isEncryptionEnabled ? <ShieldCheck className="mr-2 h-5 w-5" /> : <Upload className="mr-2 h-5 w-5" />}
+              <span className="font-bold text-base">
+                {isEncryptionEnabled ? 'Secure & Sync' : 'Upload Public'} {files.length} File{files.length > 1 ? 's' : ''}
+              </span>
             </>
           )}
         </Button>
