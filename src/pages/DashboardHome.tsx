@@ -122,9 +122,17 @@ export default function DashboardHome() {
   const susdCoin = firstPage?.data?.find((c: any) => c.asset_type === SUSD_TOKEN_ADDRESS);
   const susdBalance = susdCoin?.amount || 0;
 
+  // HYPER VISIBLE DEBUG
+  console.log("%c[ChainVault] Dashboard Component Rendered", "color: cyan; font-weight: bold; font-size: 14px");
+  console.log("[ChainVault] Connected:", connected);
+  console.log("[ChainVault] Account Address:", account?.address?.toString());
+
   useEffect(() => {
+    if (!coinsData) {
+      console.log("[ChainVault] Waiting for coinsData...");
+    }
     if (coinsData && firstPage?.data) {
-      console.log("[ChainVault] --- COIN SYNC DEBUG ---");
+      console.log("%c[ChainVault] --- COIN SYNC DEBUG ---", "color: yellow; font-weight: bold");
       console.log("[ChainVault] Active Account:", account?.address?.toString());
       console.log("[ChainVault] Looking for Asset Type:", SUSD_TOKEN_ADDRESS);
       console.log("[ChainVault] Total Assets Found:", firstPage.data.length);
@@ -134,14 +142,14 @@ export default function DashboardHome() {
       );
       
       if (foundSUSD) {
-        console.log("[ChainVault] SUCCESS: Found ShelbyUSD Asset:", foundSUSD);
+        console.log("%c[ChainVault] SUCCESS: Found ShelbyUSD Asset:", "color: green; font-weight: bold", foundSUSD);
       } else {
         console.warn("[ChainVault] FAILURE: ShelbyUSD NOT found in list.");
-        console.log("[ChainVault] List of first 5 assets:", firstPage.data.slice(0, 5).map((c: any) => c.asset_type));
+        console.log("[ChainVault] All detected assets:", firstPage.data.map((c: any) => c.asset_type));
       }
       console.log("[ChainVault] ------------------------");
     }
-  }, [coinsData, account]);
+  }, [coinsData, account, firstPage]);
 
   const aptDisplay = balanceLoading
     ? "…"
