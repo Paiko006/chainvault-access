@@ -113,7 +113,7 @@ export default function DashboardHome() {
   const lastUpload = blobs[0] ? fromShelbyTimestamp(blobs[0].created_at).toLocaleDateString() : "—";
 
   const { data: coinsData, isLoading: coinsLoading } = useAccountCoins({
-    address: account?.address.toString() || "",
+    address: account?.address?.toString() || "",
   });
 
   // Extract SUSD balance from the first page of the infinite query
