@@ -121,9 +121,10 @@ export default function DashboardHome() {
   const susdBalance = firstPage?.data?.find((c: any) => c.asset_type === SUSD_TOKEN_ADDRESS)?.amount || 0;
 
   useEffect(() => {
-    if (coinsData && coinsData.pages[0]) {
-      console.log("[ChainVault] FULL COINS LIST:", coinsData.pages[0].data);
-      const found = coinsData.pages[0].data.find((c: any) => c.asset_type.toLowerCase().includes("shelby_usd"));
+    const firstPage = coinsData?.pages[0] as any;
+    if (firstPage && firstPage.data) {
+      console.log("[ChainVault] FULL COINS LIST:", firstPage.data);
+      const found = firstPage.data.find((c: any) => c.asset_type.toLowerCase().includes("shelby_usd"));
       if (found) {
         console.log("[ChainVault] Found matching coin:", found);
       } else {
