@@ -222,10 +222,23 @@ export async function syncUserQuota(owner: string, apiKey?: string): Promise<num
 }
 
 /**
- * Helper to convert Shelby microsecond timestamps to JS Date objects
+ * Helper to convert Shelby timestamps to JS Date objects.
+ * Handles microseconds (16 digits), milliseconds (13 digits), and seconds (10 digits).
  */
-export function fromShelbyTimestamp(micros: string | number): Date {
-  return new Date(Number(micros) / 1000);
+export function fromShelbyTimestamp(ts: string | number): Date {
+  const val = Number(ts);
+  if (isNaN(val) || val === 0) return new Date();
+
+  // 1. Microseconds (Aptos standard, ~16 digits)
+  if (val > 10 ** 15) {
+    return new Date(val / 1000);
+  }
+  // 2. Milliseconds (JS standard, ~13 digits)
+  if (val > 10 ** 12) {
+    return new Date(val);
+  }
+  // 3. Seconds (Unix standard, ~10 digits)
+  return new Date(val * 1000);
 }
 
 /**
