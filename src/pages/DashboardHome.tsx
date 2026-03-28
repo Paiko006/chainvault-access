@@ -112,9 +112,57 @@ export default function DashboardHome() {
   const totalSize = blobs.reduce((s, b) => s + Number(b.size), 0);
   const lastUpload = blobs[0] ? fromShelbyTimestamp(blobs[0].created_at).toLocaleDateString() : "—";
 
-  const { data: coinsData, isLoading: coinsLoading } = useAccountCoins({
+  // DIRECT RPC FALLBACK for ShelbyUSD
+  const [susdBalance, setSusdBalance] = useState<number>(0);
+  const [coinsLoading, setCoinsLoading] = useState(false);
+
+  useEffect(() => {
+    async function fetchSUSD() {
+      if (!account) return;
+      setCoinsLoading(true);
+      try {
+        console.log("[ChainVault] Attempting direct RPC fetch for SUSD...");
+        const addr = account.address.toString();
+        
+        // Use the official Aptos provider via ShelbyClient or direct
+        // ShelbyClient already has an aptos client internally
+        const aptos = (shelbyClient as any).aptos; 
+        if (!aptos) {
+          console.warn("[ChainVault] Aptos client not found on shelbyClient");
+          return;
+        }
+
+        // Fetch account's fungible assets directly
+        const resources = await aptos.getAccountCoinsData({
+          accountAddress: addr
+        });
+
+        console.log("[ChainVault] Direct RPC Coins Found:", resources?.length);
+        const susd = resources?.find((c: any) => c.asset_type === SUSD_TOKEN_ADDRESS);
+        
+        if (susd) {
+          console.log("[ChainVault] Direct RPC SUCCESS:", susd);
+          setSusdBalance(Number(susd.amount));
+        } else {
+          console.log("[ChainVault] Direct RPC: SUSD not found in resources");
+          setSusdBalance(0);
+        }
+      } catch (err) {
+        console.error("[ChainVault] Direct RPC Error:", err);
+      } finally {
+        setCoinsLoading(false);
+      }
+    }
+    fetchSUSD();
+  }, [account, shelbyClient, blobs]); // Re-fetch when blobs sync (proxy for activity)
+
+  // Disabling the problematic hook for now to avoid console noise
+  const coinsData = null; 
+  /*
+  const { data: coinsData, isLoading: coinsLoadingHook } = useAccountCoins({
     address: account?.address?.toString() || "",
   });
+  */
 
   // Extract SUSD balance from the first page of the infinite query
   // ShelbyUSD is a Fungible Asset on Aptos Testnet
