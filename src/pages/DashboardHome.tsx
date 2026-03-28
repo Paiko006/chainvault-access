@@ -117,21 +117,25 @@ export default function DashboardHome() {
   });
 
   // Extract SUSD balance from the first page of the infinite query
+  // ShelbyUSD is a Fungible Asset on Aptos Testnet
   const firstPage = coinsData?.pages[0] as any;
-  const susdBalance = firstPage?.data?.find((c: any) => c.asset_type === SUSD_TOKEN_ADDRESS)?.amount || 0;
+  const susdCoin = firstPage?.data?.find((c: any) => 
+    c.asset_type === SUSD_TOKEN_ADDRESS || 
+    c.asset_type.toLowerCase().includes("shelby_usd")
+  );
+  
+  const susdBalance = susdCoin?.amount || 0;
 
   useEffect(() => {
-    const firstPage = coinsData?.pages[0] as any;
-    if (firstPage && firstPage.data) {
-      console.log("[ChainVault] FULL COINS LIST:", firstPage.data);
-      const found = firstPage.data.find((c: any) => c.asset_type.toLowerCase().includes("shelby_usd"));
-      if (found) {
-        console.log("[ChainVault] Found matching coin:", found);
+    if (coinsData && firstPage?.data) {
+      console.log("[ChainVault] Coins Data Found:", firstPage.data.length, "assets");
+      if (susdCoin) {
+        console.log("[ChainVault] Found ShelbyUSD Asset:", susdCoin);
       } else {
-        console.warn("[ChainVault] No coin found matching 'shelby_usd' in the list.");
+        console.warn("[ChainVault] ShelbyUSD not found in account assets. Double check faucet or network.");
       }
     }
-  }, [coinsData]);
+  }, [coinsData, susdCoin]);
 
   const aptDisplay = balanceLoading
     ? "…"
