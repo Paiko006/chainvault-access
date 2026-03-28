@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { useAptBalance } from "@aptos-labs/react";
+import { useShelbyClient } from "@shelby-protocol/react";
 import { Link } from "react-router-dom";
 import { shortenAddress } from "@/lib/wallet";
 import { fetchAccountBlobs, ShelbyBlob, formatBytes, fromShelbyTimestamp, syncUserQuota } from "@/lib/shelby-indexer";
@@ -12,6 +13,7 @@ import { QUOTA_STORAGE_KEY, DEFAULT_QUOTA } from "@/components/landing/PricingSe
 
 export default function DashboardHome() {
   const { connected, account, signMessage } = useWallet();
+  const shelbyClient = useShelbyClient();
   const { data: aptBalance, isLoading: balanceLoading } = useAptBalance();
   const [blobs, setBlobs] = useState<ShelbyBlob[]>([]);
   const [loading, setLoading] = useState(false);
@@ -65,9 +67,37 @@ export default function DashboardHome() {
           }
 
           const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || "";
-          const data = await fetchAccountBlobs(addr, apiKey);
-          setBlobs(data);
-          setLastSync(new Date());
+          
+          try {
+            const officialBlobs = await shelbyClient.coordination.getAccountBlobs({ account: addr });
+            
+            const mappedBlobs: ShelbyBlob[] = (officialBlobs || []).map((b: any) => ({
+              blob_name: b.blobNameSuffix || b.name || b.blob_name,
+              size: b.size || 0,
+              created_at: Math.floor((b.timestamp || b.creationMicros || b.createdAt || Date.now()) / 1000).toString(),
+              expires_at: b.expirationMicros ? Math.floor(b.expirationMicros / 1000000).toString() : "9999999999",
+              owner: addr,
+            }));
+
+            // Deduplicate by Name (match FilesPage)
+            const deduplicated = mappedBlobs.filter((b, index, self) => {
+              const rawName = b.blob_name.includes('/') ? b.blob_name.split('/').slice(1).join('/') : b.blob_name;
+              return self.findIndex(prev => {
+                const prevRaw = prev.blob_name.includes('/') ? prev.blob_name.split('/').slice(1).join('/') : prev.blob_name;
+                return prevRaw === rawName;
+              }) === index;
+            });
+
+            // No dot filter here either to match FilesPage fixes
+            deduplicated.sort((a, b) => Number(b.created_at) - Number(a.created_at));
+            setBlobs(deduplicated);
+            setLastSync(new Date());
+          } catch (sdkErr) {
+            console.warn("SDK fetch blobs failed, falling back to indexer:", sdkErr);
+            const data = await fetchAccountBlobs(addr, apiKey);
+            setBlobs(data);
+            setLastSync(new Date());
+          }
         } catch (err) {
           console.error("Failed to sync blobs:", err);
         } finally {
