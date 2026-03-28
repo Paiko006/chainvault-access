@@ -126,12 +126,26 @@ export default function FilesPage() {
     loadFiles();
   }, [connected, account, refresh, apiKey]);
 
-  const filtered = blobs.filter((b) => {
-    // Basic text search filter
-    if (search && !b.blob_name.toLowerCase().includes(search.toLowerCase())) return false;
+  const filtered = blobs.filter((b, index, self) => {
+    // Get the base name without the @address/ prefix
+    const rawName = b.blob_name.includes('/') ? b.blob_name.split('/').slice(1).join('/') : b.blob_name;
     
-    // We show all files (including .quota and hidden system files) 
-    // to match 100% with Shelby Explorer count as requested.
+    // 1. Deduplicate by Name: Only show the first (newest) occurrence of each unique file name
+    // This is the core logic that will make the count match Shelby Explorer's unique asset list.
+    const isFirstOccurrence = self.findIndex(prev => {
+      const prevRaw = prev.blob_name.includes('/') ? prev.blob_name.split('/').slice(1).join('/') : prev.blob_name;
+      return prevRaw === rawName;
+    }) === index;
+
+    if (!isFirstOccurrence) return false;
+
+    // 2. Hide system files starting with '.' (like .quota, .chainvault_pubkey)
+    // If you want to see these, comment out the line below.
+    if (rawName.startsWith('.')) return false;
+
+    // 3. Basic text search filter
+    if (search && !rawName.toLowerCase().includes(search.toLowerCase())) return false;
+    
     return true;
   });
 
