@@ -17,7 +17,7 @@ import { syncUserQuota } from "@/lib/shelby-indexer";
 export const QUOTA_STORAGE_KEY = "chainvault_quota";
 export const QUOTA_BLOB_PREFIX = ".quota_";
 export const DEFAULT_QUOTA = 5 * 1024 * 1024 * 1024; // 5 GB
-export const SUSD_TOKEN_ADDRESS = "0x58022a868425261d7667a731d7986708f36c56782d49e15ad21c568778a48ef2::shelby_usd::SUSD"; // Mock ShelbyUSD
+export const SUSD_TOKEN_ADDRESS = "0x1b18363a9f1fe5e6ebf247daba5cc1c18052bb232efdc4c50f556053922d98e1"; // Official ShelbyUSD Testnet FA
 export const RECIPIENT_ADDRESS = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"; // Mock Treasury
 
 const plans = [
