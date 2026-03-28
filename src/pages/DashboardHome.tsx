@@ -9,7 +9,8 @@ import { Link } from "react-router-dom";
 import { shortenAddress } from "@/lib/wallet";
 import { fetchAccountBlobs, ShelbyBlob, formatBytes, fromShelbyTimestamp, syncUserQuota } from "@/lib/shelby-indexer";
 import { getVaultKey, normalizeAptosAddress } from "@/lib/crypto";
-import { QUOTA_STORAGE_KEY, DEFAULT_QUOTA } from "@/components/landing/PricingSection";
+import { QUOTA_STORAGE_KEY, DEFAULT_QUOTA, SUSD_TOKEN_ADDRESS } from "@/components/landing/PricingSection";
+import { useAccountCoins } from "@aptos-labs/react";
 
 export default function DashboardHome() {
   const { connected, account, signMessage } = useWallet();
@@ -111,11 +112,23 @@ export default function DashboardHome() {
   const totalSize = blobs.reduce((s, b) => s + Number(b.size), 0);
   const lastUpload = blobs[0] ? fromShelbyTimestamp(blobs[0].created_at).toLocaleDateString() : "—";
 
+  const { data: coinsData, isLoading: coinsLoading } = useAccountCoins({
+    address: account?.address.toString() || "",
+  });
+
+  // Extract SUSD balance from the first page of the infinite query
+  const firstPage = coinsData?.pages[0] as any;
+  const susdBalance = firstPage?.data?.find((c: any) => c.asset_type === SUSD_TOKEN_ADDRESS)?.amount || 0;
+
   const aptDisplay = balanceLoading
     ? "…"
     : aptBalance != null
     ? `${Number(aptBalance) / 1e8} APT`
-    : "—";
+    : "0 APT";
+
+  const susdDisplay = coinsLoading
+    ? "…"
+    : `${Number(susdBalance) / 1e8} SUSD`;
 
   const stats = [
     {
@@ -133,14 +146,15 @@ export default function DashboardHome() {
     {
       label: "APT Balance",
       value: aptDisplay,
-      icon: Share2,
+      icon: ShieldCheck,
       color: "text-primary",
     },
     {
-      label: "Last Activity",
-      value: lastUpload,
-      icon: Clock,
+      label: "ShelbyUSD",
+      value: susdDisplay,
+      icon: Share2,
       color: "text-accent",
+      faucet: "https://explorer.shelby.xyz/testnet/faucet"
     },
   ];
 
@@ -228,7 +242,20 @@ export default function DashboardHome() {
                 <span className="text-[10px] text-muted-foreground ml-1 font-normal tracking-tight">/ {formatBytes(quota)}</span>
               )}
             </div>
-            <div className="text-xs text-muted-foreground uppercase tracking-widest font-bold">{s.label}</div>
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-muted-foreground uppercase tracking-widest font-bold">{s.label}</div>
+              {s.label === "ShelbyUSD" && (
+                <a 
+                  href="https://explorer.shelby.xyz/testnet/faucet" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-[9px] font-black text-accent hover:underline uppercase flex items-center gap-1"
+                >
+                  Faucet
+                  <ExternalLink className="h-2.5 w-2.5" />
+                </a>
+              )}
+            </div>
           </div>
         ))}
       </div>
