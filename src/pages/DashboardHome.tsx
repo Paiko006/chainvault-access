@@ -120,15 +120,23 @@ export default function DashboardHome() {
   const firstPage = coinsData?.pages[0] as any;
   const susdBalance = firstPage?.data?.find((c: any) => c.asset_type === SUSD_TOKEN_ADDRESS)?.amount || 0;
 
+  useEffect(() => {
+    if (coinsData) {
+      console.log("[ChainVault] Coins Data:", coinsData);
+      console.log("[ChainVault] Looking for Asset:", SUSD_TOKEN_ADDRESS);
+      console.log("[ChainVault] Found Balance:", susdBalance);
+    }
+  }, [coinsData, susdBalance]);
+
   const aptDisplay = balanceLoading
     ? "…"
     : aptBalance != null
     ? `${Number(aptBalance) / 1e8} APT`
     : "0 APT";
-
-  const susdDisplay = coinsLoading
+  
+  const shelbyUsdDisplay = coinsLoading
     ? "…"
-    : `${Number(susdBalance) / 1e8} SUSD`;
+    : `${Number(susdBalance) / 1e8} ShelbyUSD`;
 
   const stats = [
     {
@@ -150,8 +158,8 @@ export default function DashboardHome() {
       color: "text-primary",
     },
     {
-      label: "ShelbyUSD",
-      value: susdDisplay,
+      label: "ShelbyUSD Balance",
+      value: shelbyUsdDisplay,
       icon: Share2,
       color: "text-accent",
       faucet: "https://explorer.shelby.xyz/testnet/faucet"
@@ -244,7 +252,7 @@ export default function DashboardHome() {
             </div>
             <div className="flex items-center justify-between">
               <div className="text-xs text-muted-foreground uppercase tracking-widest font-bold">{s.label}</div>
-              {s.label === "ShelbyUSD" && (
+              {s.label === "ShelbyUSD Balance" && (
                 <a 
                   href="https://explorer.shelby.xyz/testnet/faucet" 
                   target="_blank" 
