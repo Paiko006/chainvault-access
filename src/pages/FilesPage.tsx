@@ -23,7 +23,7 @@ import {
   Unlock,
   ShieldAlert
 } from "lucide-react";
-import { useDeleteBlobs } from "@shelby-protocol/react";
+import { useDeleteBlobs, useShelbyClient } from "@shelby-protocol/react";
 import { toast } from "sonner";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { Link } from "react-router-dom";
@@ -58,6 +58,7 @@ import {
 
 export default function FilesPage() {
   const { connected, account, signAndSubmitTransaction, signMessage } = useWallet();
+  const shelbyClient = useShelbyClient();
   const { addNotification } = useNotifications();
   const [search, setSearch] = useState("");
   const [blobs, setBlobs] = useState<ShelbyBlob[]>([]);
@@ -111,11 +112,35 @@ export default function FilesPage() {
           localStorage.setItem(QUOTA_STORAGE_KEY, networkQuota.toString());
         }
 
-        const userBlobs = await fetchAccountBlobs(addr, apiKey);
-        setBlobs(userBlobs);
+        // Use ONLY the official Shelby SDK to fetch exactly what Explorer sees
+        try {
+          const officialBlobs = await shelbyClient.coordination.getAccountBlobs({ account: addr });
+          
+          // Map to match the ShelbyBlob type used in our UI
+          const mappedBlobs: ShelbyBlob[] = (officialBlobs || []).map((b: any) => ({
+            blob_name: b.blobNameSuffix || b.name || b.blob_name, // Handle any naming quirks
+            size: b.size || 0,
+            created_at: Math.floor((b.timestamp || b.creationMicros || b.createdAt || Date.now()) / 1000).toString(),
+            expires_at: b.expirationMicros ? Math.floor(b.expirationMicros / 1000000).toString() : "9999999999",
+            owner: addr,
+          }));
 
-        const shared = await fetchSharedBlobs(addr, apiKey);
-        setSharedBlobs(shared);
+          // Sort like Explorer (newest first)
+          mappedBlobs.sort((a, b) => Number(b.created_at) - Number(a.created_at));
+          setBlobs(mappedBlobs);
+        } catch(sdkErr) {
+          console.warn("[ChainVault] SDK fetchAccountBlobs failed, falling back to indexer", sdkErr);
+          const userBlobs = await fetchAccountBlobs(addr, apiKey);
+          setBlobs(userBlobs);
+        }
+
+        try {
+          // This one remains the same if there's no official SDK equivalent for shared blobs
+          const shared = await fetchSharedBlobs(addr, apiKey);
+          setSharedBlobs(shared);
+        } catch(sharedErr) {
+           console.warn("[ChainVault] Failed fetching shared blobs:", sharedErr);
+        }
       } catch (err) {
         console.error("[ChainVault] Error fetching files:", err);
       } finally {
