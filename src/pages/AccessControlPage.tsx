@@ -21,9 +21,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
+import { useShelbyClient } from "@shelby-protocol/react";
 import { getStoredBlobs, saveStoredBlobs, StoredBlob } from "@/types/storage";
 import { toast } from "sonner";
-import { fetchAccountBlobs, ShelbyBlob } from "@/lib/shelby-indexer";
+import { fetchAccountBlobs, ShelbyBlob, fromShelbyTimestamp } from "@/lib/shelby-indexer";
 import { getVaultKey, normalizeAptosAddress } from "@/lib/crypto";
 import {
   Dialog,
@@ -36,7 +37,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 
 export default function AccessControlPage() {
-  const { connected, account, signAndSubmitTransaction } = useWallet();
+  const { connected, account, signAndSubmitTransaction, signMessage } = useWallet();
+  const shelbyClient = useShelbyClient();
   const [search, setSearch] = useState("");
   const [newWallet, setNewWallet] = useState("");
   const [selectedBlob, setSelectedBlob] = useState<ShelbyBlob | null>(null);
@@ -57,23 +59,54 @@ export default function AccessControlPage() {
   }, [account]);
 
   useEffect(() => {
-    if (!account) return;
+    if (!connected || !account) return;
     
     const loadBlobs = async () => {
       setLoading(true);
       try {
-         const userBlobs = await fetchAccountBlobs(account.address.toString());
-         setBlobs(userBlobs);
+        const addr = account.address.toString();
+        const apiKey = localStorage.getItem("VITE_SHELBY_API_KEY") || import.meta.env.VITE_SHELBY_API_KEY;
+
+        // Use official SDK like in FilesPage
+        try {
+          const officialBlobs = await shelbyClient.coordination.getAccountBlobs({ account: addr });
+          
+          const mappedBlobs: ShelbyBlob[] = (officialBlobs || []).map((b: any) => ({
+            blob_name: b.blobNameSuffix || b.name || b.blob_name,
+            size: b.size || 0,
+            created_at: Math.floor((b.timestamp || b.creationMicros || b.createdAt || Date.now()) / 1000).toString(),
+            expires_at: b.expirationMicros ? Math.floor(b.expirationMicros / 1000000).toString() : "9999999999",
+            owner: addr,
+            // Permissions are often separate, so we might still need to fetch permissions 
+            // if the SDK doesn't include them in getAccountBlobs
+            permissions: b.permissions || []
+          }));
+
+          mappedBlobs.sort((a, b) => Number(b.created_at) - Number(a.created_at));
+          setBlobs(mappedBlobs);
+        } catch(sdkErr) {
+          console.warn("[ChainVault] SDK fetchAccountBlobs failed, falling back to indexer", sdkErr);
+          const userBlobs = await fetchAccountBlobs(addr, apiKey);
+          setBlobs(userBlobs);
+        }
       } catch (err) {
-         console.error("[ChainVault] Fetch blobs error:", err);
+        console.error("[ChainVault] Fetch blobs error:", err);
       } finally {
-         setLoading(false);
+        setLoading(false);
       }
     };
     loadBlobs();
-  }, [account]);
+  }, [connected, account, shelbyClient]);
 
-  const filtered = blobs.filter((b) =>
+  const uniqueBlobs = blobs.filter((b, index, self) => {
+    const rawName = b.blob_name.includes('/') ? b.blob_name.split('/').slice(1).join('/') : b.blob_name;
+    return self.findIndex(prev => {
+      const prevRaw = prev.blob_name.includes('/') ? prev.blob_name.split('/').slice(1).join('/') : prev.blob_name;
+      return prevRaw === rawName;
+    }) === index;
+  });
+
+  const filtered = uniqueBlobs.filter((b) =>
     b.blob_name.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -243,11 +276,11 @@ export default function AccessControlPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="glass-card p-4 rounded-xl border-primary/10 bg-primary/5">
           <p className="text-[10px] uppercase tracking-wider font-bold text-primary/70 mb-1">Total Assets</p>
-          <p className="text-2xl font-bold">{loading ? "..." : blobs.length}</p>
+          <p className="text-2xl font-bold">{loading ? "..." : uniqueBlobs.length}</p>
         </div>
         <div className="glass-card p-4 rounded-xl border-accent/10 bg-accent/5">
           <p className="text-[10px] uppercase tracking-wider font-bold text-accent/70 mb-1">Shared Files</p>
-          <p className="text-2xl font-bold">{loading ? "..." : blobs.filter(b => b.permissions && b.permissions.length > 0).length}</p>
+          <p className="text-2xl font-bold">{loading ? "..." : uniqueBlobs.filter(b => b.permissions && b.permissions.length > 0).length}</p>
         </div>
         <div className="glass-card p-4 rounded-xl border-muted/20 bg-muted/5">
           <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1">Network Status</p>
