@@ -81,9 +81,11 @@ export default function DashboardHome() {
 
             // Deduplicate by Name (match FilesPage)
             const deduplicated = mappedBlobs.filter((b, index, self) => {
-              const rawName = b.blob_name.includes('/') ? b.blob_name.split('/').slice(1).join('/') : b.blob_name;
+              const bName = b.blob_name || "Unnamed Asset";
+              const rawName = bName.includes('/') ? bName.split('/').slice(1).join('/') : bName;
               return self.findIndex(prev => {
-                const prevRaw = prev.blob_name.includes('/') ? prev.blob_name.split('/').slice(1).join('/') : prev.blob_name;
+                const prevName = prev.blob_name || "Unnamed Asset";
+                const prevRaw = prevName.includes('/') ? prevName.split('/').slice(1).join('/') : prevName;
                 return prevRaw === rawName;
               }) === index;
             });
@@ -464,7 +466,8 @@ export default function DashboardHome() {
               </thead>
               <tbody>
                 {blobs.slice(0, 10).map((b, idx) => {
-                  const rawName = b.blob_name.includes('/') ? b.blob_name.split('/').slice(1).join('/') : b.blob_name;
+                  const bName = b.blob_name || "Unnamed Asset";
+                  const rawName = bName.includes('/') ? bName.split('/').slice(1).join('/') : bName;
                   // Handle both shelbysecure/ folder and old ENC-v1- prefix
                   const cleanName = rawName.replace("shelbysecure/", "").replace("ENC-v1-", "").replace(".vault", "");
                   

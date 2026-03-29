@@ -99,15 +99,17 @@ export default function AccessControlPage() {
   }, [connected, account, shelbyClient]);
 
   const uniqueBlobs = blobs.filter((b, index, self) => {
-    const rawName = b.blob_name.includes('/') ? b.blob_name.split('/').slice(1).join('/') : b.blob_name;
-    return self.findIndex(prev => {
-      const prevRaw = prev.blob_name.includes('/') ? prev.blob_name.split('/').slice(1).join('/') : prev.blob_name;
+    const bName = b.blob_name || "Unnamed Asset";
+    const rawName = bName.includes('/') ? bName.split('/').slice(1).join('/') : bName;
+    return self.findIndex((prev, idx) => {
+      const prevName = prev.blob_name || "Unnamed Asset";
+      const prevRaw = prevName.includes('/') ? prevName.split('/').slice(1).join('/') : prevName;
       return prevRaw === rawName;
     }) === index;
   });
 
   const filtered = uniqueBlobs.filter((b) =>
-    b.blob_name.toLowerCase().includes(search.toLowerCase())
+    (b.blob_name || "Unnamed Asset").toLowerCase().includes(search.toLowerCase())
   );
 
   const handleUnlockVault = async () => {
