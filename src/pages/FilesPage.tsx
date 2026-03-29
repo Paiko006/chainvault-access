@@ -606,9 +606,9 @@ const FileTable = ({
                     {fromShelbyTimestamp(b.created_at).toLocaleDateString()}
                   </td>
                   <td className="px-5 py-3.5">
-                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ${isShared ? 'bg-accent/10 text-accent border border-accent/20' : 'bg-primary/10 text-primary border border-primary/20'}`}>
-                      <span className={`h-1.5 w-1.5 rounded-full ${isShared ? 'bg-accent' : 'bg-primary'} animate-pulse`} />
-                      {isShared ? 'SHARED' : 'PRIVATE'}
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ${isEncrypted ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-secondary/50 text-muted-foreground border border-border/50'}`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${isEncrypted ? 'bg-primary animate-pulse' : 'bg-muted-foreground'}`} />
+                      {isEncrypted ? 'PRIVATE' : 'PUBLIC'}
                     </span>
                   </td>
                   <td className="px-5 py-3.5 text-right">
